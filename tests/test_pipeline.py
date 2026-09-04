@@ -12,7 +12,7 @@ from urllib.request import urlopen
 sys.path.insert(0, str(Path(__file__).parents[1]))
 from analysis import MODEL, analyze, cosine, nearest
 from api import app
-from collect import classify, merge_with_existing, normalize, record
+from collect import classify, load_discovery_queue, mark_discovery_attempt, merge_with_existing, normalize, persist_evidence, publication_metadata, record
 from fastapi.testclient import TestClient
 
 
@@ -77,6 +77,8 @@ class PipelineTests(unittest.TestCase):
         self.assertTrue(classify("I'm running LinkedIn ads and can't do conversion tracking; it is a problem")[0])
         one = record("test", "https://example.test/a", "My Facebook ads tracking is broken", None, "fixture", {})
         self.assertEqual(len(normalize([one, dict(one)])), 1)
+        rendered = record("reddit", "https://example.test/reddit", "r/FacebookAds • 2y ago author My Facebook ads are broken", None, "fixture", {}, fmt="rendered-html-dom")
+        self.assertEqual(normalize([rendered])[0]["published_at"], "2y ago")
 
     def test_merge_prefers_new_capture_for_same_source(self):
         old = record("test", "https://example.test/a", "My Facebook ads tracking is broken", None, "fixture", {})
@@ -87,6 +89,32 @@ class PipelineTests(unittest.TestCase):
             path.read_text.return_value = json.dumps(old) + "\n"
             merged = merge_with_existing([fresh])
         self.assertEqual(len(merged), 1); self.assertEqual(merged[0]["text"], fresh["text"])
+
+    def test_persist_merges_without_dropping_existing(self):
+        old = record("test", "https://example.test/a", "My Facebook ads tracking is broken", None, "fixture", {})
+        fresh = record("test", "https://example.test/b", "My Facebook ads tracking is broken", None, "fixture", {})
+        from unittest.mock import patch
+        with patch("collect.DATA") as path:
+            path.exists.return_value = True; path.read_text.return_value = json.dumps(old) + "\n"
+            merged = persist_evidence([fresh])
+        self.assertEqual({item["id"] for item in merged}, {old["id"], fresh["id"]})
+
+    def test_queue_and_publication_precision(self):
+        self.assertEqual(publication_metadata("2025-01-01T00:00:00Z", "2025-01-03T00:00:00Z"), {"publication_date_status": "exact", "publication_age_days": 2})
+        self.assertEqual(publication_metadata("5mo ago", "2025-01-03T00:00:00Z")["publication_date_status"], "relative_source_label")
+        from unittest.mock import patch
+        with patch("collect.DISCOVERY_QUEUE") as path:
+            path.exists.return_value = True
+            path.read_text.return_value = '{"platform":"reddit","source_url":"https://example.test/a","discovery_query":"q"}\n{"platform":"reddit","source_url":"https://example.test/a"}\ninvalid\n'
+            self.assertEqual(load_discovery_queue("reddit"), [{"source_url": "https://example.test/a", "discovery_query": "q", "discovered_at": "unknown"}])
+        from tempfile import TemporaryDirectory
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "queue.jsonl"
+            path.write_text('{"platform":"reddit","source_url":"https://example.test/a"}\n')
+            with patch("collect.DISCOVERY_QUEUE", path):
+                mark_discovery_attempt("https://example.test/a", "challenge")
+                self.assertEqual(load_discovery_queue("reddit"), [])
+            self.assertIn('"outcome": "challenge"', path.read_text())
 
     def test_api_tenant_and_contract(self):
         client = TestClient(app)

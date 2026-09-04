@@ -9,7 +9,7 @@ import numpy as np
 from sentence_transformers import SentenceTransformer
 from sklearn.cluster import AgglomerativeClustering
 
-from collect import classify
+from collect import classify, publication_metadata
 
 ROOT = Path(__file__).parent
 RAW, VECTORS = ROOT / "data/evidence.jsonl", ROOT / "data/vectors.jsonl"
@@ -53,6 +53,7 @@ def analyze(rows: list[dict], model: Any | None = None, persist: bool = True) ->
         accepted, topics, reason = classify(row["text"])
         classified.append({**row, "advertiser_firsthand": accepted, "topics": topics,
                            "classification_reason": reason, "candidate_relevant": True})
+        classified[-1].update(publication_metadata(row.get("published_at"), row.get("captured_at")))
     matrix = embed_texts([row["text"] for row in classified], model)
     labels = np.zeros(len(rows), dtype=int) if len(rows) < 3 else AgglomerativeClustering(
         n_clusters=min(3, len(rows)), metric="cosine", linkage="average").fit_predict(matrix)

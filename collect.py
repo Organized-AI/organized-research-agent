@@ -19,6 +19,7 @@ except ImportError:  # Unit tests inject fixtures and need no network package.
 ROOT = Path(__file__).parent
 DATA = ROOT / "data" / "evidence.jsonl"
 REPORT = ROOT / "data" / "collection-report.json"
+DISCOVERY_QUEUE = ROOT / "data" / "discovery-queue.jsonl"
 TOPICS = ("facebook ads", "conversion tracking", "lead quality", "media buying")
 MAX_PER_PLATFORM = 20
 
@@ -39,6 +40,55 @@ def record(platform: str, url: str, text: str, published_at: str | None, method:
             "source_url": url, "text": text[:8000], "published_at": published_at,
             "captured_at": now(), "extraction_method": method, "format": fmt,
             "metrics": metrics, "author": author, "provenance": "public", "live": True}
+
+
+def publication_metadata(published_at: str | None, captured_at: str | None) -> dict[str, Any]:
+    """Expose date precision without inventing a timestamp from a relative label."""
+    if not published_at:
+        return {"publication_date_status": "missing", "publication_age_days": None}
+    try:
+        published = datetime.fromisoformat(published_at.replace("Z", "+00:00"))
+        captured = datetime.fromisoformat((captured_at or now()).replace("Z", "+00:00"))
+        return {"publication_date_status": "exact", "publication_age_days": max(0, (captured - published).days)}
+    except ValueError:
+        return {"publication_date_status": "relative_source_label", "publication_age_days": None}
+
+
+def load_discovery_queue(platform: str) -> list[dict[str, str]]:
+    """Read bounded public URL leads; URLs are not evidence until a body is captured."""
+    if not DISCOVERY_QUEUE.exists():
+        return []
+    rows, seen = [], set()
+    for line in DISCOVERY_QUEUE.read_text().splitlines()[:100]:
+        try:
+            item = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        url = item.get("source_url")
+        if item.get("attempted_at") or item.get("platform") != platform or not isinstance(url, str) or not url.startswith("https://") or url in seen:
+            continue
+        seen.add(url)
+        rows.append({"source_url": url, "discovery_query": str(item.get("discovery_query") or "unspecified"),
+                     "discovered_at": str(item.get("discovered_at") or "unknown")})
+    return rows
+
+
+def mark_discovery_attempt(url: str, outcome: str) -> None:
+    """Consume a queued URL after one normal public attempt; never hammer a block."""
+    if not DISCOVERY_QUEUE.exists():
+        return
+    changed, lines = False, []
+    for line in DISCOVERY_QUEUE.read_text().splitlines():
+        try:
+            item = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if item.get("source_url") == url and not item.get("attempted_at"):
+            item.update(attempted_at=now(), outcome=outcome[:160])
+            changed = True
+        lines.append(json.dumps(item))
+    if changed:
+        DISCOVERY_QUEUE.write_text("\n".join(lines) + "\n")
 
 
 def get_json(url: str) -> Any:
@@ -116,11 +166,6 @@ def youtube(query: str) -> list[dict]:
     return rows
 
 
-REDDIT_URLS = (
-    "https://www.reddit.com/r/FacebookAds/comments/1sfiy25/a_lot_of_purchase_event_overreporting_in_the_last/",
-)
-
-
 def reddit(_: str) -> list[dict]:
     """Normal anonymous browser rendering only; never follow a challenge redirect."""
     try:
@@ -130,21 +175,28 @@ def reddit(_: str) -> list[dict]:
     rows = []
     with Camoufox(headless=True) as browser:
         page = browser.new_page()
-        for url in REDDIT_URLS:
-            response = page.goto(url, wait_until="domcontentloaded", timeout=45_000)
-            page.wait_for_timeout(4_000)
-            if "js_challenge" in page.url or "challenge" in page.url:
-                raise RuntimeError("Reddit redirected to a JavaScript challenge")
-            post = page.locator("shreddit-post")
-            if post.count() != 1:
-                raise RuntimeError("Reddit did not render one public post body")
-            text = post.inner_text(timeout=15_000)
-            if len(text) < 180:
-                raise RuntimeError("Reddit public post body was too short to validate")
-            lines = [line.strip() for line in text.split("\n") if line.strip()]
-            rows.append(record("reddit", url, text, next((line for line in lines if re.fullmatch(r"\d+(mo|w|d|h) ago", line)), None),
-                               "camoufox:normal-anonymous-rendered-shreddit-post", {"http_status": response.status if response else None},
-                               lines[3] if len(lines) > 3 else None, "rendered-html-dom"))
+        for queued in load_discovery_queue("reddit")[:5]:
+            url = queued["source_url"]
+            try:
+                response = page.goto(url, wait_until="domcontentloaded", timeout=45_000)
+                page.wait_for_timeout(4_000)
+                if "js_challenge" in page.url or "challenge" in page.url:
+                    raise RuntimeError("Reddit redirected to a JavaScript challenge")
+                post = page.locator("shreddit-post")
+                if post.count() != 1:
+                    raise RuntimeError("Reddit did not render one public post body")
+                text = post.inner_text(timeout=15_000)
+                if len(text) < 180:
+                    raise RuntimeError("Reddit public post body was too short to validate")
+                lines = [line.strip() for line in text.split("\n") if line.strip()]
+                rows.append(record("reddit", url, text, next((line for line in lines if re.fullmatch(r"\d+(?:y|mo|w|d|h) ago", line)), None),
+                                   "camoufox:normal-anonymous-rendered-shreddit-post", {"http_status": response.status if response else None,
+                                   "discovery_query": queued["discovery_query"], "discovered_at": queued["discovered_at"]},
+                                   lines[3] if len(lines) > 3 else None, "rendered-html-dom"))
+                persist_evidence([rows[-1]])
+                mark_discovery_attempt(url, "captured")
+            except Exception as exc:
+                mark_discovery_attempt(url, f"blocked_or_unverified: {type(exc).__name__}: {exc}")
     return rows
 
 
@@ -251,8 +303,13 @@ def normalize(items: list[dict]) -> list[dict]:
         if not item.get("source_url") or item["id"] in seen or not item.get("text"):
             continue
         seen.add(item["id"])
+        if item.get("platform") == "reddit" and not item.get("published_at"):
+            relative = re.search(r"\b\d+(?:y|mo|w|d|h) ago\b", item["text"])
+            if relative:
+                item["published_at"] = relative.group(0)
         item["advertiser_firsthand"], item["topics"], item["classification_reason"] = classify(item["text"])
         item["candidate_relevant"] = is_relevant_candidate(item["text"])
+        item.update(publication_metadata(item.get("published_at"), item.get("captured_at")))
         if item["candidate_relevant"]:
             out.append(item)
     return out
@@ -272,6 +329,14 @@ def merge_with_existing(items: list[dict]) -> list[dict]:
     merged = {item["id"]: item for item in existing if item.get("id")}
     merged.update({item["id"]: item for item in items if item.get("id")})
     return normalize(list(merged.values()))
+
+
+def persist_evidence(items: list[dict]) -> list[dict]:
+    """Atomically merge directly captured bodies before their queue outcome is final."""
+    DATA.parent.mkdir(exist_ok=True)
+    merged = merge_with_existing(items)
+    DATA.write_text("\n".join(json.dumps(row) for row in merged) + ("\n" if merged else ""))
+    return merged
 
 
 def run() -> list[dict]:
@@ -294,9 +359,7 @@ def run() -> list[dict]:
         collected.extend(platform_rows)
         report["platforms"][name] = {"method": ADAPTER_METHODS[name], "direct_bodies": fetched,
                                      "retrieved": len(platform_rows), "accepted": sum(r["advertiser_firsthand"] for r in platform_rows), "errors": errors}
-    DATA.parent.mkdir(exist_ok=True)
-    collected = merge_with_existing(collected)
-    DATA.write_text("\n".join(json.dumps(row) for row in collected) + ("\n" if collected else ""))
+    collected = persist_evidence(collected)
     report["finished_at"] = now()
     REPORT.write_text(json.dumps(report, indent=2) + "\n")
     print(json.dumps(report))

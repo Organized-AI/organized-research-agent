@@ -217,7 +217,7 @@
         records
           .map(
             (r) =>
-              `<article class="source"><div><b>${esc(r.platform)}</b><br><small>${esc(r.format)}</small></div><p>${esc(r.text).slice(0, 500)}<br><small>${r.advertiser_firsthand ? "Accepted firsthand complaint" : "Candidate; review required"} · ${esc(r.classification_reason)} · ${esc(r.extraction_method)}</small></p><a href="${r.source_url}" target="_blank" rel="noreferrer">source ↗</a></article>`,
+              `<article class="source"><div><b>${esc(r.platform)}</b><br><small>${esc(r.format)}</small></div><p>${esc(r.text).slice(0, 500)}<br><small>${r.advertiser_firsthand ? "Accepted firsthand complaint" : "Candidate; review required"} · ${esc(r.classification_reason)} · ${esc(r.extraction_method)}<br>Published: ${esc(r.published_at || "unknown")} · date precision: ${esc(r.publication_date_status)}${r.publication_age_days === null ? "" : ` · age at capture: ${r.publication_age_days}d`}</small></p><a href="${r.source_url}" target="_blank" rel="noreferrer">source ↗</a></article>`,
           )
           .join("") ||
         "<p>No directly retrieved evidence is available yet; no simulated replacement.</p>";

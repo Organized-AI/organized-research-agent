@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse
 from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field
 
 from analysis import MODEL, nearest, summarize
-from collect import classify
+from collect import classify, publication_metadata
 
 ROOT, RAW, VECTORS = Path(__file__).parent, Path(__file__).parent / "data/evidence.jsonl", Path(__file__).parent / "data/vectors.jsonl"
 TENANT = "demo-tenant"
@@ -94,6 +94,8 @@ class Evidence(BaseModel):
     advertiser_firsthand: bool
     topics: list[str]
     classification_reason: str
+    publication_date_status: str
+    publication_age_days: int | None = None
     cluster: int | None = None
     similarity: float | None = None
 
@@ -110,6 +112,7 @@ def rows() -> list[dict]:
     for item in result:
         accepted, topics, reason = classify(item["text"])
         item.update(advertiser_firsthand=accepted, topics=topics, classification_reason=reason, candidate_relevant=True)
+        item.update(publication_metadata(item.get("published_at"), item.get("captured_at")))
     return result
 
 
