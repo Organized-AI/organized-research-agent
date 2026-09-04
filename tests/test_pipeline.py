@@ -93,6 +93,8 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(client.get("/api/evidence", headers={"X-Demo-Tenant": "other"}).status_code, 404)
         response = client.get("/api/evidence", headers={"X-Demo-Tenant": "demo-tenant"})
         self.assertEqual(response.status_code, 200); self.assertIn("counts", response.json())
+        integrations = client.get("/api/integrations", headers={"X-Demo-Tenant": "demo-tenant"})
+        self.assertEqual(integrations.status_code, 200); self.assertGreaterEqual(len(integrations.json()["items"]), 38)
         self.assertEqual(client.get("/api/search", headers={"X-Demo-Tenant": "demo-tenant"}, params={"q": "x"}).status_code, 422)
 
     def test_bounded_local_relay(self):

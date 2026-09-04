@@ -15,6 +15,55 @@ ROOT, RAW, VECTORS = Path(__file__).parent, Path(__file__).parent / "data/eviden
 TENANT = "demo-tenant"
 app = FastAPI(title="Organized Research Agent", version="0.3.0")
 
+# Synter's documented footprint, captured 2026-09-04 from
+# https://docs.syntermedia.ai/integrations. This is an inventory, not a claim
+# that this local pilot can read an account or collect public evidence from it.
+SYNTER_INTEGRATIONS = (
+    ("Google Ads", "paid search", "live", "authorized account required"),
+    ("Microsoft Ads", "paid search", "live", "authorized account required"),
+    ("Search Ads 360", "paid search", "marketing/MCP listed; not detailed in integrations guide", "authorized account required"),
+    ("Apple Search Ads", "paid search", "marketing/MCP listed; not detailed in integrations guide", "authorized account required"),
+    ("Meta Ads (Facebook, Instagram, Messenger, Audience Network)", "paid social", "live", "authorized account required; public discussion adapter not enabled"),
+    ("LinkedIn Ads", "paid social", "live", "authorized account required; public-post pilot coverage"),
+    ("Reddit Ads", "paid social", "live", "authorized account required; normal public-page coverage is partial"),
+    ("TikTok Ads", "paid social", "live", "authorized account required; public search currently login-limited"),
+    ("X Ads", "paid social", "live", "authorized account required; public search currently login-limited"),
+    ("Pinterest Ads", "paid social", "live", "authorized account required"),
+    ("Snapchat Ads", "paid social", "live", "authorized account required"),
+    ("Samsung Ads", "CTV / smart TV", "marketing/MCP listed; not detailed in integrations guide", "authorized account required"),
+    ("Google Analytics 4", "analytics", "live", "authorized account required"),
+    ("Google Tag Manager", "analytics", "live", "authorized account required"),
+    ("YouTube", "analytics / video", "live", "authorized account required; public search adapter has no retained firsthand evidence"),
+    ("PostHog", "analytics", "API-key auth", "authorized account required"),
+    ("Mixpanel", "analytics", "API-key auth", "authorized account required"),
+    ("Segment", "customer data", "API-key auth", "authorized account required"),
+    ("HubSpot", "CRM", "live", "authorized account required"),
+    ("Attio", "CRM", "live", "authorized account required"),
+    ("Salesforce", "CRM", "coming soon", "not enabled"),
+    ("Shopify", "commerce", "live", "authorized account required"),
+    ("The Trade Desk", "programmatic / DSP", "API-key auth", "authorized account required"),
+    ("Amazon DSP", "programmatic / DSP", "live", "authorized account required"),
+    ("Display & Video 360", "programmatic / DSP", "live", "authorized account required"),
+    ("StackAdapt", "programmatic / DSP", "live", "authorized account required"),
+    ("FreeWheel", "programmatic / CTV", "live", "authorized account required"),
+    ("Campaign Manager 360", "programmatic / ad serving", "live", "authorized account required"),
+    ("Taboola", "native / content", "marketing/MCP listed; not detailed in integrations guide", "authorized account required"),
+    ("Outbrain", "native / content", "marketing/MCP listed; not detailed in integrations guide", "authorized account required"),
+    ("Amazon Ads", "retail media", "live", "authorized account required"),
+    ("Walmart Connect", "retail media", "live", "authorized account required"),
+    ("Instacart Ads", "retail media", "live", "authorized account required"),
+    ("Target Roundel", "retail media", "live", "authorized account required"),
+    ("Criteo Commerce Media", "retail media", "live", "authorized account required"),
+    ("OpenAI Ads & LLM Placements", "AI / LLM", "live", "authorized account required"),
+    ("Spotify Ads", "audio / podcast", "live", "authorized account required"),
+    ("Nextdoor Ads", "local advertising", "live", "authorized account required"),
+    ("Stripe", "revenue / payments", "API-key auth", "authorized account required"),
+    ("Loops", "email marketing", "API-key auth", "authorized account required"),
+    ("Klaviyo", "email marketing", "live", "authorized account required"),
+    ("Slack", "notifications", "live", "authorized account required"),
+    ("Google Drive", "storage / export", "live", "authorized account required"),
+)
+
 
 class Evidence(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -62,6 +111,14 @@ def public_evidence(item: dict) -> dict:
 @app.get("/api/health")
 def health():
     return {"status": "ok", "mode": "local-public-pilot", "embedding": MODEL["model"], "dimension": MODEL["dimension"]}
+
+
+@app.get("/api/integrations")
+def integrations(x_demo_tenant: str | None = Header(None)):
+    tenant(x_demo_tenant)
+    return {"source": "https://docs.syntermedia.ai/integrations", "captured_at": "2026-09-04",
+            "items": [{"name": name, "category": category, "documented_status": status, "local_access": access}
+                      for name, category, status, access in SYNTER_INTEGRATIONS]}
 
 
 @app.get("/api/evidence")
