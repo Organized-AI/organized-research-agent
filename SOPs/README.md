@@ -11,16 +11,16 @@
 | Safe approach | Record the access limitation, try another legitimate public source, and report the actual coverage. Do not turn fixtures into live records or pad platform counts. |
 | Regression check | Validate provenance, normalized record shape, vector finiteness and tenant filtering before exposing any collected record through the API. |
 
-## Prototype interaction checks — `index.html`, `styles.css`, `app.js`
+## Prototype interaction checks — `index.html`
 
 **Status: confirmed (local test).**
 
 | Field | Guidance |
 | --- | --- |
 | Symptom | A route or selected 3D pipeline stage appears blank or non-responsive. |
-| Cause / evidence | The deck uses a small client-side view router and seeded fixture shapes in `app.js`; malformed fixture data or a mismatched section id can leave a view empty. |
-| Safe approach | Preserve matching `data-view`/section IDs and `data-stage`/fixture keys. Keep public sources clearly illustrative and retain the simulated labels. |
-| Regression check | Run `npm test`, then inspect Workspace, Evidence, Opportunities, and Reports in the browser. Click a stage and one evidence row; stage controls must remain semantic buttons with an updated `aria-pressed` state. |
+| Cause / evidence | The single-page local view reads `/api/summary`, `/api/evidence`, and, after embedding, `/api/search`. A stale vector file can make semantic search unavailable. |
+| Safe approach | Keep labels tied to actual API denominators. Run `analysis.py` after a collection before calling search; never inject simulated evidence. |
+| Regression check | Run the Python test suite, start `api.py`, and inspect the local ledger plus a semantic query. |
 
 ## Composition and API fixture — `partials/header.html`, `nginx.conf`, `api.py`
 
@@ -29,9 +29,9 @@
 | Field | Guidance |
 | --- | --- |
 | Symptom | Shared header drift or a demo endpoint appears to offer multi-tenant persistence. |
-| Cause / evidence | The header is a small SSI fragment. The standard-library API writes only fictional workspace metadata into a local SQLite control-plane database and rejects non-demo tenants. Nginx is not installed in this environment. |
-| Safe approach | Keep SSI fragments presentation-only. Keep SQLite local to one API/control-plane instance—never mount one SQLite file across pods. Treat worker queues/shards as a later, separately coordinated runtime. |
-| Regression check | Run `npm test`, request `/health` from `npm run api`, and run `nginx -t -c nginx.conf` only in an environment with Nginx. |
+| Cause / evidence | FastAPI reads ignored local evidence/vector files and rejects non-demo tenants. Nginx is not installed in this environment. |
+| Safe approach | Bind FastAPI to loopback and keep raw evidence/vector files local. Treat multi-worker persistence as future work. |
+| Regression check | Run the Python suite, request `/api/health`, and run `nginx -t -c nginx.conf` only in an environment with Nginx. |
 
 ## Local proxy harness — `local-proxy-test.mjs`
 

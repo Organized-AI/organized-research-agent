@@ -1,6 +1,7 @@
 node_modules/
 data/*.db
 data/*.jsonl
+data/*.json
 .venv/
 __pycache__/
 .DS_Store
