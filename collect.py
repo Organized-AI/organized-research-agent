@@ -226,12 +226,12 @@ def google_ads_community(_: str) -> list[dict]:
             text = clean(payload)
             author_match = re.search(r"\[\[\\x22([^\\]+)\\x22\],\[null,", page[end:end + 3000])
             anchors = ("google ads", "click", "campaign", "conversion", "shopify")
-            if len(text) < 180 or not title or not any(anchor in text.lower() for anchor in anchors):
+            if len(text) < 180 or not title or not author_match or not any(anchor in text.lower() for anchor in anchors):
                 raise RuntimeError("Google Ads Community page lacked a verified original advertiser body")
             rows.append(record("google_ads_community", url, title + "\n" + text, None,
                                "curl_cffi:google-ads-community-hydration", {"bytes": len(page),
                                "discovery_query": queued["discovery_query"], "discovered_at": queued["discovered_at"]},
-                               author_match.group(1) if author_match else None, "community-hydration"))
+                               author_match.group(1), "community-hydration"))
             persist_evidence([rows[-1]])
             mark_discovery_attempt(url, "captured")
         except Exception as exc:
@@ -341,6 +341,8 @@ def normalize(items: list[dict]) -> list[dict]:
     out, seen = [], set()
     for item in items:
         if not item.get("source_url") or item["id"] in seen or not item.get("text"):
+            continue
+        if item.get("platform") == "google_ads_community" and not item.get("author"):
             continue
         seen.add(item["id"])
         if item.get("platform") == "reddit" and not item.get("published_at"):

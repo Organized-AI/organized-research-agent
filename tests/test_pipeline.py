@@ -82,6 +82,8 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(len(normalize([one, dict(one)])), 1)
         rendered = record("reddit", "https://example.test/reddit", "r/FacebookAds • 2y ago author My Facebook ads are broken", None, "fixture", {}, fmt="rendered-html-dom")
         self.assertEqual(normalize([rendered])[0]["published_at"], "2y ago")
+        missing_author = record("google_ads_community", "https://example.test/community", "My Google Ads campaign is not working and conversions are missing", None, "fixture", {})
+        self.assertEqual(normalize([missing_author]), [])
 
     def test_merge_prefers_new_capture_for_same_source(self):
         old = record("test", "https://example.test/a", "My Facebook ads tracking is broken", None, "fixture", {})
