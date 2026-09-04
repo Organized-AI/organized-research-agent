@@ -8,13 +8,16 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 ROOT=Path(__file__).parent; RAW=ROOT/'data/evidence.jsonl'; VECTORS=ROOT/'data/vectors.jsonl'; TENANT='demo-tenant'
+from collect import classify
 app=FastAPI(title='Organized Research Agent', version='0.2.0')
 class Evidence(BaseModel): id:str; platform:str; source_url:str; text:str; captured_at:str; extraction_method:str; format:str; advertiser_firsthand:bool; topics:list[str]=[]
 def tenant(header:str|None):
     if header!=TENANT: raise HTTPException(404,'tenant not found')
 def rows():
     path=VECTORS if VECTORS.exists() else RAW
-    return [json.loads(x) for x in path.read_text().splitlines()] if path.exists() else []
+    data=[json.loads(x) for x in path.read_text().splitlines()] if path.exists() else []
+    for item in data: item['advertiser_firsthand'],item['topics']=classify(item['text'])
+    return data
 @app.get('/api/health')
 def health(): return {'status':'ok','mode':'local-public-pilot','embedding':'sentence-transformers/all-MiniLM-L6-v2'}
 @app.get('/api/evidence')
