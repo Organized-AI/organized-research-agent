@@ -216,7 +216,16 @@ def classify(text: str) -> tuple[bool, list[str], str]:
     t = text.lower()
     commercial = any(x in t for x in ("ads", "attribution", "pixel", "lead", "conversion", "crm", "media buying", "campaign"))
     pain = any(x in t for x in ("wrong", "broken", "mismatch", "inaccurate", "bad lead", "low quality", "waste", "manual", "problem", "issue", "doesn't", "not working", "struggle"))
-    first = bool(re.search(r"\b(?:my|our)\s+(?:ads?|campaigns?|leads?)\b|\bwe\s+spend\b|\bi\s+run\b|\bclient\s+account\b|\bfor\s+a\s+client\b", t))
+    # Possessives alone are too narrow: operators often report a live observation
+    # as "I am seeing" or "we are getting" without writing "my campaign".
+    # These verbs are only accepted alongside the independent commercial + pain
+    # gates below, so an advisory post does not become firsthand merely by using I/we.
+    first = bool(re.search(
+        r"\b(?:my|our)\s+(?:ads?|campaigns?|leads?)\b|\bwe\s+spend\b|\bi\s+run\b|"
+        r"\bclient\s+account\b|\bfor\s+a\s+client\b|"
+        r"\b(?:i(?:\s+am|'m)|we(?:\s+are|'re))\s+(?:seeing|experiencing|getting)\b",
+        t,
+    ))
     consumer = any(x in t for x in ("hate ads", "stop showing", "annoying ad"))
     promo = any(x in t for x in ("connect your", "integrates with", "sign up", "book a demo", "free trial", "we help you", "dm me", "free audit", "i've helped", "i help", "here's how", "i'll manage your"))
     topics = [name for name, terms in {"attribution": ("attribution", "roas"), "lead_quality": ("lead",), "measurement": ("pixel", "conversion", "tracking"), "workload": ("manual", "media buying"), "crm_signal": ("crm", "offline conversion")}.items() if any(term in t for term in terms)]

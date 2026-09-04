@@ -68,6 +68,11 @@ class PipelineTests(unittest.TestCase):
     def test_filter_and_dedupe(self):
         self.assertFalse(classify("Connect your ads to CRM for full attribution")[0]); self.assertTrue(classify("My ads attribution is wrong and my leads are low quality")[0])
         self.assertFalse(classify("Your ad platforms are mismatched, but this is an agency explainer")[0])
+        reddit_like = ("I am seeing Meta giving us 50% more purchase events than we actually have. "
+                       "We never had this issue before and our Pixel has operated without changes.")
+        accepted, _, reason = classify(reddit_like)
+        self.assertTrue(accepted); self.assertEqual(reason, "accepted_firsthand_complaint")
+        self.assertFalse(classify("I am seeing agencies struggle; here is how I help them fix conversion tracking")[0])
         one = record("test", "https://example.test/a", "My Facebook ads tracking is broken", None, "fixture", {})
         self.assertEqual(len(normalize([one, dict(one)])), 1)
 
