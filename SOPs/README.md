@@ -1,5 +1,16 @@
 # Prototype SOP index
 
+## Real-data pilot — `collect.py`, `analysis.py`, `api.py`, `index.html`
+
+**Status: in progress.**
+
+| Field | Guidance |
+| --- | --- |
+| Symptom | A public endpoint returns challenge/block HTML, a 403, or no relevant results. |
+| Cause / evidence | Public availability differs by platform and query; do not bypass authentication, challenges, or access controls. |
+| Safe approach | Record the access limitation, try another legitimate public source, and report the actual coverage. Do not turn fixtures into live records or pad platform counts. |
+| Regression check | Validate provenance, normalized record shape, vector finiteness and tenant filtering before exposing any collected record through the API. |
+
 ## Prototype interaction checks — `index.html`, `styles.css`, `app.js`
 
 **Status: confirmed (local test).**

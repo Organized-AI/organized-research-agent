@@ -1,5 +1,5 @@
 # Local working agreement
 
-Before editing `local-proxy-test.mjs`, read `SOPs/README.md` section **Local proxy harness**. Before editing the demo UI (`index.html`, `styles.css`, `app.js`), read its **Prototype interaction checks** section. Update the relevant SOP entry whenever a tested behavior or its safe operating guidance changes.
+Before editing any of the four primary files (`api.py`, `analysis.py`, `collect.py`, `index.html`), read the relevant SOP entry and update it whenever a tested behavior or its safe operating guidance changes.
 
-Keep all work within this directory. Use fictional fixture data only; no production credentials, private merchant data, outbound collection, or externally reachable proxy.
+Keep all work within this directory. A bounded, public, terms-respecting research pilot is authorized: collect only legitimate public content without authentication bypass, publish no fetched corpus or database, and never store credentials or private merchant data. Bind local services to loopback only.
