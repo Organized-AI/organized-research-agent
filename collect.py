@@ -163,6 +163,8 @@ def linkedin_search(_: str) -> list[dict]:
         "https://www.linkedin.com/posts/izazgoogleadsexpert_googleads-conversiontracking-digitalmarketing-activity-7381282230821707776-BEMe",
         "https://www.linkedin.com/posts/nicholas-a-brown_a-month-ago-i-posted-about-my-experience-activity-7479862973205766144-7lIR",
         "https://www.linkedin.com/posts/talentpirate_googleads-leadgeneration-ppc-activity-7396384091912196096-pW2K",
+        "https://www.linkedin.com/posts/travi0074_metaads-googleads-digitaladvertising-activity-7465407715914452992-vVgN",
+        "https://www.linkedin.com/posts/muhammad-mijanur_facebookads-metaads-digitalmarketing-activity-7469100408767143936-OsYg",
     )
     rows = []
     for url in urls:
@@ -201,10 +203,10 @@ def classify(text: str) -> tuple[bool, list[str], str]:
     pain = any(x in t for x in ("wrong", "broken", "mismatch", "inaccurate", "bad lead", "low quality", "waste", "manual", "problem", "issue", "doesn't", "not working", "struggle"))
     first = bool(re.search(r"\b(?:my|our)\s+(?:ads?|campaigns?|leads?)\b|\bwe\s+spend\b|\bi\s+run\b|\bclient\s+account\b|\bfor\s+a\s+client\b", t))
     consumer = any(x in t for x in ("hate ads", "stop showing", "annoying ad"))
-    promo = any(x in t for x in ("connect your", "integrates with", "sign up", "book a demo", "free trial", "we help you"))
+    promo = any(x in t for x in ("connect your", "integrates with", "sign up", "book a demo", "free trial", "we help you", "dm me", "free audit", "i've helped", "i help", "here's how", "i'll manage your"))
     topics = [name for name, terms in {"attribution": ("attribution", "roas"), "lead_quality": ("lead",), "measurement": ("pixel", "conversion", "tracking"), "workload": ("manual", "media buying"), "crm_signal": ("crm", "offline conversion")}.items() if any(term in t for term in terms)]
     accepted = commercial and pain and first and not consumer and not promo
-    reason = "accepted_firsthand_complaint" if accepted else ("excluded_consumer_or_promotional" if consumer or promo else "relevant_candidate_needs_review")
+    reason = "accepted_firsthand_complaint" if accepted else ("promotional_or_advisory_candidate" if promo else ("excluded_consumer" if consumer else "relevant_candidate_needs_review"))
     return accepted, topics, reason
 
 
@@ -213,7 +215,7 @@ def is_relevant_candidate(text: str) -> bool:
     t = text.lower()
     paid_context = any(x in t for x in ("facebook ads", "meta ads", "google ads", "ad account", "ad campaign", "media buying", "paid social", "attribution", "conversion tracking", "conversion mismatch", "offline conversion", "crm", "pixel"))
     experience = any(x in t for x in ("my ad", "our ad", "my campaign", "our campaign", "client account", "i run", "we spend", "wrong", "broken", "mismatch", "inaccurate", "missing", "bad lead", "low quality", "waste", "manual", "problem", "issue", "doesn't", "not working", "struggle"))
-    excluded = any(x in t for x in ("hate ads", "stop showing", "annoying ad", "connect your", "integrates with", "sign up", "book a demo", "free trial", "we help you", "i create and manage", "i will set up", "boost your business", "with froggyads", "ppc ads expert", "benchmarks reveal", "which is suitable for your campaign"))
+    excluded = any(x in t for x in ("hate ads", "stop showing", "annoying ad", "connect your", "integrates with", "sign up", "book a demo", "free trial", "we help you", "i'll manage your", "i create and manage", "i will set up", "boost your business", "with froggyads", "ppc ads expert", "benchmarks reveal", "which is suitable for your campaign"))
     return paid_context and experience and not excluded
 
 
