@@ -117,19 +117,34 @@ def youtube(query: str) -> list[dict]:
 
 
 REDDIT_URLS = (
-    "https://www.reddit.com/r/FacebookAds/comments/1tbz7dy/is_my_budget_related_to_my_leads_quality/",
-    "https://www.reddit.com/r/FacebookAds/comments/1w1v0jc/some_help_needed/",
+    "https://www.reddit.com/r/FacebookAds/comments/1sfiy25/a_lot_of_purchase_event_overreporting_in_the_last/",
 )
 
 
 def reddit(_: str) -> list[dict]:
-    """Only accept an actual public post body; login shells and .json 403s are access failures."""
+    """Normal anonymous browser rendering only; never follow a challenge redirect."""
+    try:
+        from camoufox.sync_api import Camoufox
+    except ImportError as exc:
+        raise RuntimeError("optional Camoufox browser runtime is not installed") from exc
     rows = []
-    for url in REDDIT_URLS:
-        page = get_page(url)
-        if "Welcome to Reddit" in page or "Log in or sign up" in page or "shreddit-post" not in page:
-            raise RuntimeError("Reddit returned a login/challenge shell instead of the requested public post body")
-        raise RuntimeError("Reddit page parser intentionally refuses unverified post markup")
+    with Camoufox(headless=True) as browser:
+        page = browser.new_page()
+        for url in REDDIT_URLS:
+            response = page.goto(url, wait_until="domcontentloaded", timeout=45_000)
+            page.wait_for_timeout(4_000)
+            if "js_challenge" in page.url or "challenge" in page.url:
+                raise RuntimeError("Reddit redirected to a JavaScript challenge")
+            post = page.locator("shreddit-post")
+            if post.count() != 1:
+                raise RuntimeError("Reddit did not render one public post body")
+            text = post.inner_text(timeout=15_000)
+            if len(text) < 180:
+                raise RuntimeError("Reddit public post body was too short to validate")
+            lines = [line.strip() for line in text.split("\n") if line.strip()]
+            rows.append(record("reddit", url, text, next((line for line in lines if re.fullmatch(r"\d+(mo|w|d|h) ago", line)), None),
+                               "camoufox:normal-anonymous-rendered-shreddit-post", {"http_status": response.status if response else None},
+                               lines[3] if len(lines) > 3 else None, "rendered-html-dom"))
     return rows
 
 
@@ -191,7 +206,7 @@ ADAPTERS = {"bluesky": bluesky, "mastodon": mastodon, "lemmy": lemmy, "peertube"
 ADAPTER_METHODS = {
     "bluesky": "public ATProto search endpoint", "mastodon": "public Mastodon tag timeline endpoint",
     "lemmy": "public Lemmy search endpoint", "peertube": "public PeerTube search endpoint",
-    "youtube": "normal public YouTube search page with embedded result metadata", "reddit": "normal public Reddit post pages",
+    "youtube": "normal public YouTube search page with embedded result metadata", "reddit": "normal anonymous Camoufox rendered Reddit post",
     "x": "normal public X search page", "tiktok": "normal public TikTok search page", "linkedin": "curl_cffi static LinkedIn article HTML (Camoufox-equivalence checked)",
 }
 
