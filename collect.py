@@ -221,7 +221,8 @@ def classify(text: str) -> tuple[bool, list[str], str]:
     # These verbs are only accepted alongside the independent commercial + pain
     # gates below, so an advisory post does not become firsthand merely by using I/we.
     first = bool(re.search(
-        r"\b(?:my|our)\s+(?:ads?|campaigns?|leads?)\b|\bwe\s+spend\b|\bi\s+run\b|"
+        r"\b(?:my|our)\s+(?:ads?|campaigns?|leads?)\b|\bwe\s+spend\b|"
+        r"\bi(?:\s+am|'m)\s+(?:running|trying)\b|\bi\s+run\b|"
         r"\bclient\s+account\b|\bfor\s+a\s+client\b|"
         r"\b(?:i(?:\s+am|'m)|we(?:\s+are|'re))\s+(?:seeing|experiencing|getting)\b",
         t,
@@ -257,6 +258,22 @@ def normalize(items: list[dict]) -> list[dict]:
     return out
 
 
+def merge_with_existing(items: list[dict]) -> list[dict]:
+    """Keep the local evidence ledger append-only by source identity across runs."""
+    existing = []
+    if DATA.exists():
+        for line in DATA.read_text().splitlines():
+            try:
+                existing.append(json.loads(line))
+            except json.JSONDecodeError:
+                continue
+    # A newly fetched record refreshes mutable capture metadata for the same URL;
+    # an earlier direct capture is retained when a later public request is blocked.
+    merged = {item["id"]: item for item in existing if item.get("id")}
+    merged.update({item["id"]: item for item in items if item.get("id")})
+    return normalize(list(merged.values()))
+
+
 def run() -> list[dict]:
     collected: list[dict] = []
     report: dict[str, Any] = {"started_at": now(), "platforms": {}, "scope": "direct public endpoint bodies only"}
@@ -278,6 +295,7 @@ def run() -> list[dict]:
         report["platforms"][name] = {"method": ADAPTER_METHODS[name], "direct_bodies": fetched,
                                      "retrieved": len(platform_rows), "accepted": sum(r["advertiser_firsthand"] for r in platform_rows), "errors": errors}
     DATA.parent.mkdir(exist_ok=True)
+    collected = merge_with_existing(collected)
     DATA.write_text("\n".join(json.dumps(row) for row in collected) + ("\n" if collected else ""))
     report["finished_at"] = now()
     REPORT.write_text(json.dumps(report, indent=2) + "\n")

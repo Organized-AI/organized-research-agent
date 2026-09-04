@@ -12,7 +12,7 @@ from urllib.request import urlopen
 sys.path.insert(0, str(Path(__file__).parents[1]))
 from analysis import MODEL, analyze, cosine, nearest
 from api import app
-from collect import classify, normalize, record
+from collect import classify, merge_with_existing, normalize, record
 from fastapi.testclient import TestClient
 
 
@@ -73,8 +73,19 @@ class PipelineTests(unittest.TestCase):
         accepted, _, reason = classify(reddit_like)
         self.assertTrue(accepted); self.assertEqual(reason, "accepted_firsthand_complaint")
         self.assertFalse(classify("I am seeing agencies struggle; here is how I help them fix conversion tracking")[0])
+        self.assertTrue(classify("I'm running LinkedIn ads and can't do conversion tracking; it is a problem")[0])
         one = record("test", "https://example.test/a", "My Facebook ads tracking is broken", None, "fixture", {})
         self.assertEqual(len(normalize([one, dict(one)])), 1)
+
+    def test_merge_prefers_new_capture_for_same_source(self):
+        old = record("test", "https://example.test/a", "My Facebook ads tracking is broken", None, "fixture", {})
+        fresh = dict(old, text="My Facebook ads tracking is still broken", captured_at="later")
+        from unittest.mock import patch
+        with patch("collect.DATA") as path:
+            path.exists.return_value = True
+            path.read_text.return_value = json.dumps(old) + "\n"
+            merged = merge_with_existing([fresh])
+        self.assertEqual(len(merged), 1); self.assertEqual(merged[0]["text"], fresh["text"])
 
     def test_api_tenant_and_contract(self):
         client = TestClient(app)
