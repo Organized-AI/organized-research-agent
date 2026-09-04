@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark" />
+    <title>Organized Research Agent — simulated workspace</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="tailwind.css" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="noise" aria-hidden="true"></div>
+    <main class="shell">
+      <!--# include virtual="/partials/header.html" -->
+
+      <section class="hero view" id="overview">
+        <div class="eyebrow"><span class="pulse"></span> RESEARCH REPLAY · 14 DAY WINDOW</div>
+        <div class="hero-copy"><div><h1>Turn public signals into<br /><em>next tests.</em></h1><p>Evidence-first research for media-buying teams. Distinguish what was observed from what is inferred before a recommendation moves forward.</p></div><div class="hero-score"><span>REPLAY CONFIDENCE</span><strong id="confidence">82%</strong><small>Seeded test deck</small></div></div>
+        <section class="cockpit" aria-label="Research control panel">
+          <div class="control-heading"><div><span class="kicker">01 / RESEARCH SCOPE</span><h2>Traffic quality & measurement friction</h2></div><button class="ghost-button" id="resetDemo">Reset replay</button></div>
+          <div class="controls-grid">
+            <label>Sources<select id="sourceSelect"><option>Public communities + ad libraries</option><option>Organic creator + affiliate activity</option><option>Competitor offers + storefronts</option></select></label>
+            <label>Market<select id="marketSelect"><option>US / English</option><option>UK / English</option><option>Australia / English</option></select></label>
+            <label>Signal window<select id="windowSelect"><option>Last 14 days</option><option>Last 30 days</option><option>Last 90 days</option></select></label>
+            <label>Capacity<input id="capacity" type="range" min="100" max="300" value="260" /><output for="capacity" id="capacityOutput">260M</output><small>simulated record capacity</small></label>
+          </div>
+          <div class="run-row"><button class="run-button" id="runReplay"><span>▶</span> Run simulated research</button><span id="runStatus">Replay loaded · no live collection</span><div class="credit"><span>SIMULATED BUDGET</span><strong>4,800 credits</strong></div></div>
+        </section>
+
+        <section class="pipeline-section" aria-labelledby="pipeline-title">
+          <div class="section-title"><div><span class="kicker">02 / RESEARCH SYSTEM</span><h2 id="pipeline-title">Follow the evidence, not the dashboard.</h2></div><p>Select a stage to inspect the contract and resulting artifact.</p></div>
+          <div class="pipeline-wrap">
+            <div class="pipeline" aria-label="Research process stages">
+              <button class="stage stage-1 selected" data-stage="scope" aria-pressed="true"><span class="stage-icon">⌁</span><b>Scope</b><small>Brief & guardrails</small></button>
+              <i class="connector c1"></i><button class="stage stage-2" data-stage="collect" aria-pressed="false"><span class="stage-icon">↳</span><b>Collect</b><small>Public snapshots</small></button>
+              <i class="connector c2"></i><button class="stage stage-3" data-stage="prove" aria-pressed="false"><span class="stage-icon">◇</span><b>Prove</b><small>Provenance & dedupe</small></button>
+              <i class="connector c3"></i><button class="stage stage-4" data-stage="model" aria-pressed="false"><span class="stage-icon">✦</span><b>Model</b><small>Clusters & momentum</small></button>
+              <i class="connector c4"></i><button class="stage stage-5" data-stage="test" aria-pressed="false"><span class="stage-icon">→</span><b>Test</b><small>Opportunity cards</small></button>
+            </div>
+            <aside class="stage-detail" id="stageDetail" aria-live="polite"></aside>
+          </div>
+          <div class="legend"><span><i class="observed"></i> Observed public fact</span><span><i class="estimated"></i> Model estimate</span><span><i class="private"></i> Authorized merchant metric (future input)</span></div>
+        </section>
+
+        <section class="metrics" aria-label="Run coverage metrics">
+          <article><span>UNIQUE PUBLIC ITEMS</span><strong id="uniqueCount">18.4M</strong><small>from 26.0M simulated snapshots</small></article>
+          <article><span>RELEVANT CLUSTERS</span><strong id="clusterCount">34</strong><small>7 require human review</small></article>
+          <article class="coverage-card"><span>COVERAGE HEALTH</span><strong>87<span>%</span></strong><div class="coverage-bar"><i></i></div><small>2 source fetch failures shown in trend notes</small></article>
+          <article><span>PILOT TARGETS</span><strong>85 / 80</strong><small>complaint / fit-label precision targets</small></article>
+        </section>
+      </section>
+
+      <section class="view hidden" id="evidence">
+        <div class="page-heading"><span class="eyebrow">03 / SOURCE-LINKED EVIDENCE</span><h1>Evidence drawer</h1><p>Fictional examples designed to show the review experience. A complaint is a stated experience, not proof of a technical cause.</p></div>
+        <div class="evidence-layout"><div class="evidence-list" id="evidenceList"></div><aside class="evidence-drawer" id="evidenceDrawer"></aside></div>
+      </section>
+
+      <section class="view hidden" id="opportunities">
+        <div class="page-heading"><span class="eyebrow">04 / RECOMMENDATIONS</span><h1>Three evidence-backed next tests</h1><p>Fit is proposed—not assumed—and only moves ahead when the public evidence supports it.</p></div>
+        <div class="opportunity-grid" id="opportunityGrid"></div>
+      </section>
+
+      <section class="view hidden" id="reports">
+        <div class="page-heading"><span class="eyebrow">05 / REPLAY REPORT</span><h1>What this run can—and cannot—say.</h1></div>
+        <div class="report-grid"><article><span class="kicker">OBSERVED</span><h3>Complaints about mismatch between platform reporting and downstream quality increased in the sampled public discussion.</h3><p>Public posts and dated source snapshots support this directional observation.</p></article><article><span class="kicker">ESTIMATED</span><h3>“Lead quality” is the strongest emerging semantic cluster.</h3><p>Estimated from fixture scoring and simulated coverage; it is not an outcome metric.</p></article><article><span class="kicker">NOT ESTABLISHED</span><h3>Actual bot traffic, competitor spend, conversion volume, or ROAS.</h3><p>Those need authorized merchant metrics, experiments, or direct platform data.</p></article></div>
+        <div class="audit-note"><span>Evaluation protocol</span><p>Targets: 85% complaint precision and 80% supported fit-label precision. These are proposed pilot thresholds, <strong>not achieved measurements</strong>. Run a 300-item human review plus a missed-complaint audit before changing customer messaging.</p></div>
+      </section>
+    </main>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script src="app.js"></script>
+  </body>
+</html>
