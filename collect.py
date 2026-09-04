@@ -274,7 +274,7 @@ def classify(text: str) -> tuple[bool, list[str], str]:
     # gates below, so an advisory post does not become firsthand merely by using I/we.
     first = bool(re.search(
         r"\b(?:my|our)\s+(?:ads?|campaigns?|leads?)\b|\bwe\s+spend\b|"
-        r"\bi(?:\s+am|'m)\s+(?:running|trying)\b|\bi\s+run\b|"
+        r"\bi(?:\s+am|'m)\s+(?:running|trying)\b|\bi(?:\s+have|'ve)\s+(?:run|ran)\b|\bi\s+run\b|"
         r"\bclient\s+account\b|\bfor\s+a\s+client\b|"
         r"\b(?:i(?:\s+am|'m)|we(?:\s+are|'re))\s+(?:seeing|experiencing|getting)\b",
         t,

@@ -75,6 +75,7 @@ class PipelineTests(unittest.TestCase):
         self.assertTrue(accepted); self.assertEqual(reason, "accepted_firsthand_complaint")
         self.assertFalse(classify("I am seeing agencies struggle; here is how I help them fix conversion tracking")[0])
         self.assertTrue(classify("I'm running LinkedIn ads and can't do conversion tracking; it is a problem")[0])
+        self.assertTrue(classify("I have ran all types of Facebook ads for my branded store, but my ads died")[0])
         one = record("test", "https://example.test/a", "My Facebook ads tracking is broken", None, "fixture", {})
         self.assertEqual(len(normalize([one, dict(one)])), 1)
         rendered = record("reddit", "https://example.test/reddit", "r/FacebookAds • 2y ago author My Facebook ads are broken", None, "fixture", {}, fmt="rendered-html-dom")
