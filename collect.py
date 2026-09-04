@@ -49,6 +49,15 @@ def get_json(url: str) -> Any:
     return response.json()
 
 
+def get_page(url: str) -> str:
+    if not curl_requests:
+        raise RuntimeError("curl_cffi unavailable")
+    response = curl_requests.get(url, impersonate="chrome", timeout=15,
+                                 headers={"Accept": "text/html,application/xhtml+xml"})
+    response.raise_for_status()
+    return response.text
+
+
 def bluesky(query: str) -> list[dict]:
     data = get_json("https://api.bsky.app/xrpc/app.bsky.feed.searchPosts?q=" + quote(query) + "&limit=25")
     return [record("bluesky", f"https://bsky.app/profile/{p['author']['did']}/post/{p['uri'].rsplit('/', 1)[-1]}", p.get("record", {}).get("text", ""), p.get("record", {}).get("createdAt"), "curl_cffi:atproto-search", {"like_count": p.get("likeCount"), "reply_count": p.get("replyCount"), "repost_count": p.get("repostCount")}, p.get("author", {}).get("handle"), "atproto-json") for p in data.get("posts", [])]
@@ -74,7 +83,86 @@ def peertube(query: str) -> list[dict]:
     return [record("peertube", video.get("url"), video.get("name", "") + " " + (video.get("description") or ""), video.get("publishedAt"), "curl_cffi:peertube-public-search", {"views": video.get("views"), "likes": video.get("likes"), "comments": video.get("comments")}, video.get("channel", {}).get("displayName"), "peertube-json") for video in data.get("data", []) if video.get("url")]
 
 
-ADAPTERS = {"bluesky": bluesky, "mastodon": mastodon, "lemmy": lemmy, "peertube": peertube}
+def walk(value: Any):
+    if isinstance(value, dict):
+        yield value
+        for child in value.values():
+            yield from walk(child)
+    elif isinstance(value, list):
+        for child in value:
+            yield from walk(child)
+
+
+def youtube(query: str) -> list[dict]:
+    """Parse result metadata embedded in YouTube's normal public search page, not its Data API."""
+    page = get_page("https://www.youtube.com/results?search_query=" + quote(query))
+    marker = "var ytInitialData = "
+    start = page.find(marker)
+    if start < 0:
+        raise RuntimeError("YouTube public result data unavailable")
+    payload, _ = json.JSONDecoder().raw_decode(page[start + len(marker):])
+    rows = []
+    for node in walk(payload):
+        video = node.get("videoRenderer") if isinstance(node, dict) else None
+        if not video or not video.get("videoId"):
+            continue
+        title = " ".join(run.get("text", "") for run in video.get("title", {}).get("runs", []))
+        description = " ".join(run.get("text", "") for run in video.get("detailedMetadataSnippets", [{}])[0].get("snippetText", {}).get("runs", []))
+        author = " ".join(run.get("text", "") for run in video.get("ownerText", {}).get("runs", [])) or None
+        published = video.get("publishedTimeText", {}).get("simpleText")
+        rows.append(record("youtube", "https://www.youtube.com/watch?v=" + video["videoId"], title + " " + description,
+                           published, "curl_cffi:youtube-public-search-page", {"views": video.get("viewCountText", {}).get("simpleText"),
+                           "duration": video.get("lengthText", {}).get("simpleText")}, author, "youtube-search-html-json"))
+    return rows
+
+
+REDDIT_URLS = (
+    "https://www.reddit.com/r/FacebookAds/comments/1tbz7dy/is_my_budget_related_to_my_leads_quality/",
+    "https://www.reddit.com/r/FacebookAds/comments/1w1v0jc/some_help_needed/",
+)
+
+
+def reddit(_: str) -> list[dict]:
+    """Only accept an actual public post body; login shells and .json 403s are access failures."""
+    rows = []
+    for url in REDDIT_URLS:
+        page = get_page(url)
+        if "Welcome to Reddit" in page or "Log in or sign up" in page or "shreddit-post" not in page:
+            raise RuntimeError("Reddit returned a login/challenge shell instead of the requested public post body")
+        raise RuntimeError("Reddit page parser intentionally refuses unverified post markup")
+    return rows
+
+
+def page_probe(platform: str, url: str) -> list[dict]:
+    """Record that a normal public search/page did not expose a usable discussion body."""
+    page = get_page(url)
+    lower = page.lower()
+    if "log in" in lower or "login" in lower or "sign in" in lower:
+        raise RuntimeError(f"{platform} served a login shell/no directly extractable public discussion body")
+    raise RuntimeError(f"{platform} page did not expose a verified public discussion body")
+
+
+def x_search(_: str) -> list[dict]:
+    return page_probe("X", "https://x.com/search?q=" + quote("facebook ads tracking") + "&src=typed_query")
+
+
+def tiktok_search(_: str) -> list[dict]:
+    return page_probe("TikTok", "https://www.tiktok.com/search?q=" + quote("facebook ads lead quality"))
+
+
+def linkedin_search(_: str) -> list[dict]:
+    return page_probe("LinkedIn", "https://www.linkedin.com/posts/search?keywords=" + quote("facebook ads tracking"))
+
+
+ADAPTERS = {"bluesky": bluesky, "mastodon": mastodon, "lemmy": lemmy, "peertube": peertube,
+            "youtube": youtube, "reddit": reddit, "x": x_search, "tiktok": tiktok_search,
+            "linkedin": linkedin_search}
+ADAPTER_METHODS = {
+    "bluesky": "public ATProto search endpoint", "mastodon": "public Mastodon tag timeline endpoint",
+    "lemmy": "public Lemmy search endpoint", "peertube": "public PeerTube search endpoint",
+    "youtube": "normal public YouTube search page with embedded result metadata", "reddit": "normal public Reddit post pages",
+    "x": "normal public X search page", "tiktok": "normal public TikTok search page", "linkedin": "normal public LinkedIn search page",
+}
 
 
 def classify(text: str) -> tuple[bool, list[str], str]:
@@ -120,8 +208,9 @@ def run() -> list[dict]:
     for name, adapter in ADAPTERS.items():
         platform_rows: list[dict] = []
         errors: list[str] = []
-        with ThreadPoolExecutor(max_workers=len(TOPICS)) as executor:
-            futures = {executor.submit(adapter, query): query for query in TOPICS}
+        queries = ("direct-page-check",) if name in {"reddit", "x", "tiktok", "linkedin"} else TOPICS
+        with ThreadPoolExecutor(max_workers=len(queries)) as executor:
+            futures = {executor.submit(adapter, query): query for query in queries}
             for future in as_completed(futures):
                 query = futures[future]
                 try:
@@ -131,7 +220,8 @@ def run() -> list[dict]:
         fetched = len(platform_rows)
         platform_rows = normalize(platform_rows)[:MAX_PER_PLATFORM]
         collected.extend(platform_rows)
-        report["platforms"][name] = {"direct_bodies": fetched, "retrieved": len(platform_rows), "accepted": sum(r["advertiser_firsthand"] for r in platform_rows), "errors": errors}
+        report["platforms"][name] = {"method": ADAPTER_METHODS[name], "direct_bodies": fetched,
+                                     "retrieved": len(platform_rows), "accepted": sum(r["advertiser_firsthand"] for r in platform_rows), "errors": errors}
     DATA.parent.mkdir(exist_ok=True)
     DATA.write_text("\n".join(json.dumps(row) for row in collected) + ("\n" if collected else ""))
     report["finished_at"] = now()

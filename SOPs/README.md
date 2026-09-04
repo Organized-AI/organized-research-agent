@@ -42,7 +42,7 @@
 | Symptom | A provider adapter needs proxy semantics, but this prototype must never become an open relay. |
 | Cause / evidence | The harness accepts only `127.0.0.1` upstreams, rejects CONNECT, caps response bytes, and runs a bounded queued workload. It is a test relay, not Squid and not a production collector. |
 | Safe approach | Keep both servers loopback-bound and only target the owned fixture upstream. Preserve allowlisting, byte limit, queue limit, timeout, and graceful-close behavior. Do not add external hosts or credentials. |
-| Regression check | Run `npm test`; it must show a forwarded fixture request, oversized-response rejection, blocked external host, queue saturation, and clean shutdown. |
+| Regression check | Run `.venv/bin/python -m unittest discover -s tests -v`; it must show a forwarded fixture request, oversized-response rejection, blocked external host, queue saturation, and clean shutdown. |
 
 ## Untested concerns
 
