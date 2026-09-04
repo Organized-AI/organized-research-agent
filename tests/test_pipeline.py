@@ -63,6 +63,7 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(len(result["records"]), 3); self.assertTrue(all(len(r["vector"]) == 384 and abs(sum(x*x for x in r["vector"]) - 1) < 1e-8 for r in result["records"]))
         self.assertEqual(sum(cluster["count"] for cluster in result["clusters"]), result["coverage"]["n"])
         self.assertEqual({row["id"] for row in result["records"]}, {row["id"] for row in rows})
+        self.assertEqual(result["coverage"]["accepted"], 3)
         self.assertEqual(len(nearest("tracking", result["records"], FakeEncoder(), 2)), 2)
 
     def test_filter_and_dedupe(self):

@@ -9,6 +9,8 @@ import numpy as np
 from sentence_transformers import SentenceTransformer
 from sklearn.cluster import AgglomerativeClustering
 
+from collect import classify
+
 ROOT = Path(__file__).parent
 RAW, VECTORS = ROOT / "data/evidence.jsonl", ROOT / "data/vectors.jsonl"
 MODEL = {"provider": "sentence-transformers", "model": "sentence-transformers/all-MiniLM-L6-v2", "dimension": 384,
@@ -46,11 +48,16 @@ def analyze(rows: list[dict], model: Any | None = None, persist: bool = True) ->
         return {"model": MODEL, "records": [], "clusters": [], "coverage": summarize([])}
     if len({row.get("id") for row in rows}) != len(rows):
         raise ValueError("analysis requires unique record IDs")
-    matrix = embed_texts([row["text"] for row in rows], model)
+    classified = []
+    for row in rows:
+        accepted, topics, reason = classify(row["text"])
+        classified.append({**row, "advertiser_firsthand": accepted, "topics": topics,
+                           "classification_reason": reason, "candidate_relevant": True})
+    matrix = embed_texts([row["text"] for row in classified], model)
     labels = np.zeros(len(rows), dtype=int) if len(rows) < 3 else AgglomerativeClustering(
         n_clusters=min(3, len(rows)), metric="cosine", linkage="average").fit_predict(matrix)
     enriched = []
-    for row, vector, label in zip(rows, matrix, labels):
+    for row, vector, label in zip(classified, matrix, labels):
         item = dict(row)
         item["vector"] = vector.tolist()
         item["cluster"] = int(label)
@@ -60,7 +67,7 @@ def analyze(rows: list[dict], model: Any | None = None, persist: bool = True) ->
         group = [row for row in enriched if row["cluster"] == int(label)]
         clusters.append({"id": int(label), "count": len(group), "unique_contributors": len({r.get("author") for r in group if r.get("author")}),
                          "topics": sorted({t for r in group for t in r.get("topics", [])})})
-    if sum(cluster["count"] for cluster in clusters) != len(enriched) or {row["id"] for row in enriched} != {row["id"] for row in rows}:
+    if sum(cluster["count"] for cluster in clusters) != len(enriched) or {row["id"] for row in enriched} != {row["id"] for row in classified}:
         raise AssertionError("cluster/vector records must align exactly with the input corpus")
     if persist:
         VECTORS.parent.mkdir(exist_ok=True)
