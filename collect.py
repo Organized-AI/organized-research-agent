@@ -5,6 +5,7 @@ import hashlib
 import html
 import json
 import re
+import codecs
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
@@ -200,6 +201,44 @@ def reddit(_: str) -> list[dict]:
     return rows
 
 
+def google_ads_community(_: str) -> list[dict]:
+    """Extract the original question from a normal public Help Community page.
+
+    A normal anonymous browser render was compared with the static hydration
+    payload for title, author, and distinctive body anchors before enabling this
+    smaller bounded request path.
+    """
+    rows = []
+    for queued in load_discovery_queue("google_ads_community")[:5]:
+        url = queued["source_url"]
+        try:
+            page = get_page(url)
+            title_match = re.search(r"<title[^>]*>(.*?)</title>", page, re.I | re.S)
+            title = clean(title_match.group(1)) if title_match else ""
+            title_at = page.find(title, 100) if title else -1
+            start = page.find(r"\x22\\u003cdiv", title_at)
+            end = page.find(r"\x22,", start + 5)
+            if start < 0 or end < 0:
+                raise RuntimeError("Google Ads Community original-body hydration was unavailable")
+            payload = page[start + 4:end]
+            for _ in range(2):
+                payload = codecs.decode(payload, "unicode_escape")
+            text = clean(payload)
+            author_match = re.search(r"\[\[\\x22([^\\]+)\\x22\],\[null,", page[end:end + 3000])
+            anchors = ("google ads", "click", "campaign", "conversion", "shopify")
+            if len(text) < 180 or not title or not any(anchor in text.lower() for anchor in anchors):
+                raise RuntimeError("Google Ads Community page lacked a verified original advertiser body")
+            rows.append(record("google_ads_community", url, title + "\n" + text, None,
+                               "curl_cffi:google-ads-community-hydration", {"bytes": len(page),
+                               "discovery_query": queued["discovery_query"], "discovered_at": queued["discovered_at"]},
+                               author_match.group(1) if author_match else None, "community-hydration"))
+            persist_evidence([rows[-1]])
+            mark_discovery_attempt(url, "captured")
+        except Exception as exc:
+            mark_discovery_attempt(url, f"blocked_or_unverified: {type(exc).__name__}: {exc}")
+    return rows
+
+
 def page_probe(platform: str, url: str) -> list[dict]:
     """Record that a normal public search/page did not expose a usable discussion body."""
     page = get_page(url)
@@ -254,12 +293,13 @@ def linkedin_search(_: str) -> list[dict]:
 
 ADAPTERS = {"bluesky": bluesky, "mastodon": mastodon, "lemmy": lemmy, "peertube": peertube,
             "youtube": youtube, "reddit": reddit, "x": x_search, "tiktok": tiktok_search,
-            "linkedin": linkedin_search}
+            "linkedin": linkedin_search, "google_ads_community": google_ads_community}
 ADAPTER_METHODS = {
     "bluesky": "public ATProto search endpoint", "mastodon": "public Mastodon tag timeline endpoint",
     "lemmy": "public Lemmy search endpoint", "peertube": "public PeerTube search endpoint",
     "youtube": "normal public YouTube search page with embedded result metadata", "reddit": "normal anonymous Camoufox rendered Reddit post",
     "x": "normal public X search page", "tiktok": "normal public TikTok search page", "linkedin": "curl_cffi static LinkedIn article HTML (Camoufox-equivalence checked)",
+    "google_ads_community": "curl_cffi Google Ads Community hydration (Camoufox-equivalence checked)",
 }
 
 
@@ -267,13 +307,13 @@ def classify(text: str) -> tuple[bool, list[str], str]:
     """Conservative transparent classification; it is not a claim of market incidence."""
     t = text.lower()
     commercial = any(x in t for x in ("ads", "attribution", "pixel", "lead", "conversion", "crm", "media buying", "campaign"))
-    pain = any(x in t for x in ("wrong", "broken", "mismatch", "inaccurate", "bad lead", "low quality", "waste", "manual", "problem", "issue", "doesn't", "not working", "struggle", "died"))
+    pain = any(x in t for x in ("wrong", "broken", "mismatch", "inaccurate", "bad lead", "low quality", "waste", "manual", "problem", "issue", "doesn't", "not working", "struggle", "died", "failed", "fraud"))
     # Possessives alone are too narrow: operators often report a live observation
     # as "I am seeing" or "we are getting" without writing "my campaign".
     # These verbs are only accepted alongside the independent commercial + pain
     # gates below, so an advisory post does not become firsthand merely by using I/we.
     first = bool(re.search(
-        r"\b(?:my|our)\s+(?:ads?|campaigns?|leads?)\b|\bwe\s+spend\b|"
+        r"\b(?:my|our)\s+(?:ads?|campaigns?|leads?|accounts?|shopify|store)\b|\bwe\s+spend\b|"
         r"\bi(?:\s+am|'m)\s+(?:running|trying)\b|\bi(?:\s+have|'ve)\s+(?:run|ran)\b|\bi\s+run\b|"
         r"\bclient\s+account\b|\bfor\s+a\s+client\b|"
         r"\b(?:i(?:\s+am|'m)|we(?:\s+are|'re))\s+(?:seeing|experiencing|getting)\b",
@@ -291,7 +331,7 @@ def is_relevant_candidate(text: str) -> bool:
     """Reject search-keyword collisions, generic news, consumer posts, and promotional copy."""
     t = text.lower()
     paid_context = any(x in t for x in ("facebook ads", "meta ads", "google ads", "ad account", "ad campaign", "media buying", "paid social", "attribution", "conversion tracking", "conversion mismatch", "offline conversion", "crm", "pixel"))
-    experience = any(x in t for x in ("my ad", "our ad", "my campaign", "our campaign", "client account", "i run", "we spend", "wrong", "broken", "mismatch", "inaccurate", "missing", "bad lead", "low quality", "waste", "manual", "problem", "issue", "doesn't", "not working", "struggle", "died"))
+    experience = any(x in t for x in ("my ad", "our ad", "my campaign", "our campaign", "client account", "i run", "we spend", "wrong", "broken", "mismatch", "inaccurate", "missing", "bad lead", "low quality", "waste", "manual", "problem", "issue", "doesn't", "not working", "struggle", "died", "failed", "fraud"))
     excluded = any(x in t for x in ("hate ads", "stop showing", "annoying ad", "connect your", "integrates with", "sign up", "book a demo", "free trial", "we help you", "i'll manage your", "i create and manage", "i will set up", "boost your business", "with froggyads", "ppc ads expert", "benchmarks reveal", "which is suitable for your campaign"))
     return paid_context and experience and not excluded
 
@@ -345,7 +385,7 @@ def run() -> list[dict]:
     for name, adapter in ADAPTERS.items():
         platform_rows: list[dict] = []
         errors: list[str] = []
-        queries = ("direct-page-check",) if name in {"reddit", "x", "tiktok", "linkedin"} else TOPICS
+        queries = ("direct-page-check",) if name in {"reddit", "x", "tiktok", "linkedin", "google_ads_community"} else TOPICS
         with ThreadPoolExecutor(max_workers=len(queries)) as executor:
             futures = {executor.submit(adapter, query): query for query in queries}
             for future in as_completed(futures):
