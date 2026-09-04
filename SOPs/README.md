@@ -11,6 +11,8 @@
 | Safe approach | Record the access limitation, try another legitimate public source, and report the actual coverage. Do not turn fixtures into live records or pad platform counts. |
 | Regression check | Validate provenance, normalized record shape, vector finiteness and tenant filtering before exposing any collected record through the API. |
 
+For a concrete public URL, an optional Camoufox normal anonymous render may establish whether its post body is actually visible. Never proceed from a `js_challenge`, CAPTCHA, login wall, or redirected challenge URL; record the rendered outcome and move to a different public source. Camoufox browser assets stay in the local user cache.
+
 ## Prototype interaction checks — `index.html`
 
 **Status: confirmed (local test).**

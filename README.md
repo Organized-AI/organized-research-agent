@@ -14,6 +14,8 @@ python -m venv .venv
 
 Open `http://127.0.0.1:4173`. The page only exposes the local corpus and calls the tenant-protected evidence API. Search becomes available after `analysis.py` persists vectors.
 
+The LinkedIn adapter uses Camoufox’s normal anonymous rendering for two concrete public post URLs. Its browser asset is fetched separately with `.venv/bin/python -m camoufox fetch`; it remains in the user cache, not this repository. The collector never logs in, handles a challenge, or uses a proxy.
+
 ## Verify
 
 ```sh

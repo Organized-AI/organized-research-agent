@@ -151,7 +151,32 @@ def tiktok_search(_: str) -> list[dict]:
 
 
 def linkedin_search(_: str) -> list[dict]:
-    return page_probe("LinkedIn", "https://www.linkedin.com/posts/search?keywords=" + quote("facebook ads tracking"))
+    """Render selected concrete public LinkedIn posts anonymously; no sign-in or challenge handling."""
+    try:
+        from camoufox.sync_api import Camoufox
+    except ImportError as exc:
+        raise RuntimeError("optional Camoufox browser runtime is not installed") from exc
+    urls = (
+        "https://www.linkedin.com/posts/solaiman-hossen-ratan_googleads-facebookads-googleanalytics4-activity-7386068693224603648-Lakv",
+        "https://www.linkedin.com/posts/wafaruk_tracking-ga4-metaads-activity-7438013257056989184--DH6",
+    )
+    rows = []
+    with Camoufox(headless=True) as browser:
+        page = browser.new_page()
+        for url in urls:
+            response = page.goto(url, wait_until="domcontentloaded", timeout=45_000)
+            page.wait_for_timeout(5_000)
+            article = page.locator("article")
+            if article.count() < 1:
+                raise RuntimeError("LinkedIn did not render a public post article")
+            text = article.first.inner_text(timeout=15_000)
+            if not text.strip() or "Sign in" in text[:300] or (response and response.status >= 400):
+                raise RuntimeError("LinkedIn did not expose a public post body")
+            bits = [part.strip() for part in text.split("\n") if part.strip()]
+            rows.append(record("linkedin", url, text, next((part for part in bits if re.fullmatch(r"\d+(mo|w|d|h)", part)), None),
+                               "camoufox:normal-anonymous-rendered-public-post", {"http_status": response.status if response else None},
+                               bits[0] if bits else None, "rendered-html-dom"))
+    return rows
 
 
 ADAPTERS = {"bluesky": bluesky, "mastodon": mastodon, "lemmy": lemmy, "peertube": peertube,
@@ -161,7 +186,7 @@ ADAPTER_METHODS = {
     "bluesky": "public ATProto search endpoint", "mastodon": "public Mastodon tag timeline endpoint",
     "lemmy": "public Lemmy search endpoint", "peertube": "public PeerTube search endpoint",
     "youtube": "normal public YouTube search page with embedded result metadata", "reddit": "normal public Reddit post pages",
-    "x": "normal public X search page", "tiktok": "normal public TikTok search page", "linkedin": "normal public LinkedIn search page",
+    "x": "normal public X search page", "tiktok": "normal public TikTok search page", "linkedin": "normal anonymous Camoufox-rendered LinkedIn post pages",
 }
 
 
@@ -170,7 +195,7 @@ def classify(text: str) -> tuple[bool, list[str], str]:
     t = text.lower()
     commercial = any(x in t for x in ("ads", "attribution", "pixel", "lead", "conversion", "crm", "media buying", "campaign"))
     pain = any(x in t for x in ("wrong", "broken", "mismatch", "inaccurate", "bad lead", "low quality", "waste", "manual", "problem", "issue", "doesn't", "not working", "struggle"))
-    first = any(x in t for x in ("my ad", "my campaign", "my lead", "our ad", "our campaign", "we spend", "i run", "client account", "for a client"))
+    first = bool(re.search(r"\b(?:my|our)\s+(?:ads?|campaigns?|leads?)\b|\bwe\s+spend\b|\bi\s+run\b|\bclient\s+account\b|\bfor\s+a\s+client\b", t))
     consumer = any(x in t for x in ("hate ads", "stop showing", "annoying ad"))
     promo = any(x in t for x in ("connect your", "integrates with", "sign up", "book a demo", "free trial", "we help you"))
     topics = [name for name, terms in {"attribution": ("attribution", "roas"), "lead_quality": ("lead",), "measurement": ("pixel", "conversion", "tracking"), "workload": ("manual", "media buying"), "crm_signal": ("crm", "offline conversion")}.items() if any(term in t for term in terms)]
@@ -182,8 +207,8 @@ def classify(text: str) -> tuple[bool, list[str], str]:
 def is_relevant_candidate(text: str) -> bool:
     """Reject search-keyword collisions, generic news, consumer posts, and promotional copy."""
     t = text.lower()
-    paid_context = any(x in t for x in ("facebook ads", "meta ads", "google ads", "ad account", "ad campaign", "media buying", "paid social", "attribution", "conversion tracking", "offline conversion", "crm", "pixel"))
-    experience = any(x in t for x in ("my ad", "our ad", "my campaign", "our campaign", "client account", "i run", "we spend", "wrong", "broken", "mismatch", "inaccurate", "bad lead", "low quality", "waste", "manual", "problem", "issue", "doesn't", "not working", "struggle"))
+    paid_context = any(x in t for x in ("facebook ads", "meta ads", "google ads", "ad account", "ad campaign", "media buying", "paid social", "attribution", "conversion tracking", "conversion mismatch", "offline conversion", "crm", "pixel"))
+    experience = any(x in t for x in ("my ad", "our ad", "my campaign", "our campaign", "client account", "i run", "we spend", "wrong", "broken", "mismatch", "inaccurate", "missing", "bad lead", "low quality", "waste", "manual", "problem", "issue", "doesn't", "not working", "struggle"))
     excluded = any(x in t for x in ("hate ads", "stop showing", "annoying ad", "connect your", "integrates with", "sign up", "book a demo", "free trial", "we help you", "i create and manage", "i will set up", "boost your business", "with froggyads", "ppc ads expert", "benchmarks reveal", "which is suitable for your campaign"))
     return paid_context and experience and not excluded
 
