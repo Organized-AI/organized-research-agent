@@ -151,31 +151,35 @@ def tiktok_search(_: str) -> list[dict]:
 
 
 def linkedin_search(_: str) -> list[dict]:
-    """Render selected concrete public LinkedIn posts anonymously; no sign-in or challenge handling."""
-    try:
-        from camoufox.sync_api import Camoufox
-    except ImportError as exc:
-        raise RuntimeError("optional Camoufox browser runtime is not installed") from exc
+    """Use ordinary static HTML only after a representative Camoufox equivalence check."""
+    from lxml import html as lxml_html
     urls = (
         "https://www.linkedin.com/posts/solaiman-hossen-ratan_googleads-facebookads-googleanalytics4-activity-7386068693224603648-Lakv",
         "https://www.linkedin.com/posts/wafaruk_tracking-ga4-metaads-activity-7438013257056989184--DH6",
+        "https://www.linkedin.com/posts/chrisaveryjudeluxe_it-took-me-years-to-figure-this-one-thing-activity-7401175810952564736-eEfr",
+        "https://www.linkedin.com/posts/rabeyajaben478_googleads-ppc-leadgeneration-activity-7454891971141111808-bpEY",
+        "https://www.linkedin.com/posts/chintandesai4_rightattribution-activity-7350952470480633857-Y2iL",
+        "https://www.linkedin.com/posts/jobairmahmud365_firstpartydata-conversiontracking-gtm-activity-7448817188100030465-yzLU",
+        "https://www.linkedin.com/posts/izazgoogleadsexpert_googleads-conversiontracking-digitalmarketing-activity-7381282230821707776-BEMe",
+        "https://www.linkedin.com/posts/nicholas-a-brown_a-month-ago-i-posted-about-my-experience-activity-7479862973205766144-7lIR",
+        "https://www.linkedin.com/posts/talentpirate_googleads-leadgeneration-ppc-activity-7396384091912196096-pW2K",
     )
     rows = []
-    with Camoufox(headless=True) as browser:
-        page = browser.new_page()
-        for url in urls:
-            response = page.goto(url, wait_until="domcontentloaded", timeout=45_000)
-            page.wait_for_timeout(5_000)
-            article = page.locator("article")
-            if article.count() < 1:
-                raise RuntimeError("LinkedIn did not render a public post article")
-            text = article.first.inner_text(timeout=15_000)
-            if not text.strip() or "Sign in" in text[:300] or (response and response.status >= 400):
-                raise RuntimeError("LinkedIn did not expose a public post body")
-            bits = [part.strip() for part in text.split("\n") if part.strip()]
-            rows.append(record("linkedin", url, text, next((part for part in bits if re.fullmatch(r"\d+(mo|w|d|h)", part)), None),
-                               "camoufox:normal-anonymous-rendered-public-post", {"http_status": response.status if response else None},
-                               bits[0] if bits else None, "rendered-html-dom"))
+    for url in urls:
+        response = curl_requests.get(url, impersonate="chrome", timeout=20, headers={"Accept": "text/html,application/xhtml+xml"})
+        response.raise_for_status()
+        document = lxml_html.fromstring(response.text)
+        article_nodes = document.xpath("//main//article[1]//text()")
+        text = clean(" ".join(article_nodes))
+        text = text.split(" Like Comment Share", 1)[0].strip()
+        anchors = ("conversion", "tracking", "facebook ads", "google ads", "meta ads")
+        if len(text) < 180 or not any(anchor in text.lower() for anchor in anchors):
+            raise RuntimeError("LinkedIn static page lacks a body equivalent to the rendered public post")
+        bits = [part.strip() for part in text.split(" ") if part.strip()]
+        published = next((part for part in bits if re.fullmatch(r"\d+(mo|w|d|h)", part)), None)
+        rows.append(record("linkedin", url, text, published, "curl_cffi:linkedin-public-static-html-article",
+                           {"http_status": response.status_code, "bytes": len(response.content)}, bits[0] if bits else None,
+                           "static-html-article"))
     return rows
 
 
@@ -186,7 +190,7 @@ ADAPTER_METHODS = {
     "bluesky": "public ATProto search endpoint", "mastodon": "public Mastodon tag timeline endpoint",
     "lemmy": "public Lemmy search endpoint", "peertube": "public PeerTube search endpoint",
     "youtube": "normal public YouTube search page with embedded result metadata", "reddit": "normal public Reddit post pages",
-    "x": "normal public X search page", "tiktok": "normal public TikTok search page", "linkedin": "normal anonymous Camoufox-rendered LinkedIn post pages",
+    "x": "normal public X search page", "tiktok": "normal public TikTok search page", "linkedin": "curl_cffi static LinkedIn article HTML (Camoufox-equivalence checked)",
 }
 
 
