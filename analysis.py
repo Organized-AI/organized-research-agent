@@ -44,6 +44,8 @@ def summarize(rows: list[dict]) -> dict:
 def analyze(rows: list[dict], model: Any | None = None, persist: bool = True) -> dict:
     if not rows:
         return {"model": MODEL, "records": [], "clusters": [], "coverage": summarize([])}
+    if len({row.get("id") for row in rows}) != len(rows):
+        raise ValueError("analysis requires unique record IDs")
     matrix = embed_texts([row["text"] for row in rows], model)
     labels = np.zeros(len(rows), dtype=int) if len(rows) < 3 else AgglomerativeClustering(
         n_clusters=min(3, len(rows)), metric="cosine", linkage="average").fit_predict(matrix)
@@ -58,6 +60,8 @@ def analyze(rows: list[dict], model: Any | None = None, persist: bool = True) ->
         group = [row for row in enriched if row["cluster"] == int(label)]
         clusters.append({"id": int(label), "count": len(group), "unique_contributors": len({r.get("author") for r in group if r.get("author")}),
                          "topics": sorted({t for r in group for t in r.get("topics", [])})})
+    if sum(cluster["count"] for cluster in clusters) != len(enriched) or {row["id"] for row in enriched} != {row["id"] for row in rows}:
+        raise AssertionError("cluster/vector records must align exactly with the input corpus")
     if persist:
         VECTORS.parent.mkdir(exist_ok=True)
         VECTORS.write_text("\n".join(json.dumps(row) for row in enriched) + "\n")
