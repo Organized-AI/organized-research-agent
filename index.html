@@ -208,7 +208,7 @@
       integrations.innerHTML = items
         .map(
           (i) =>
-            `<article class="source"><div><b>${esc(i.name)}</b><br><small>${esc(i.category)}</small></div><p><small>${esc(i.documented_status)} · ${esc(i.local_access)}</small></p></article>`,
+            `<article class="source"><div><b>${esc(i.name)}</b><br><small>${esc(i.category)}</small></div><p><small>${esc(i.documented_status)} · ${esc(i.local_access)}<br>${esc(i.public_research)}</small></p></article>`,
         )
         .join("");
     }

@@ -63,6 +63,17 @@ SYNTER_INTEGRATIONS = (
     ("Slack", "notifications", "live", "authorized account required"),
     ("Google Drive", "storage / export", "live", "authorized account required"),
 )
+PUBLIC_RESEARCH_STATUS = {
+    "LinkedIn Ads": "active: concrete public post bodies, equivalence-checked static HTML",
+    "Reddit Ads": "partial: prior normal rendered post preserved; later normal retrieval hit challenge",
+    "TikTok Ads": "blocked: normal public search served a login shell",
+    "X Ads": "blocked: normal public search served a login shell",
+    "YouTube": "available: public search-page metadata adapter; no retained firsthand record",
+    "Meta Ads (Facebook, Instagram, Messenger, Audience Network)": "not implemented: no verified original public body retained",
+    "Pinterest Ads": "not implemented: no verified original public body retained",
+    "Snapchat Ads": "not implemented: no verified original public body retained",
+    "Nextdoor Ads": "not implemented: no verified original public body retained",
+}
 
 
 class Evidence(BaseModel):
@@ -117,7 +128,8 @@ def health():
 def integrations(x_demo_tenant: str | None = Header(None)):
     tenant(x_demo_tenant)
     return {"source": "https://docs.syntermedia.ai/integrations", "captured_at": "2026-09-04",
-            "items": [{"name": name, "category": category, "documented_status": status, "local_access": access}
+            "items": [{"name": name, "category": category, "documented_status": status, "local_access": access,
+                       "public_research": PUBLIC_RESEARCH_STATUS.get(name, "not implemented; authorized account data is out of scope")}
                       for name, category, status, access in SYNTER_INTEGRATIONS]}
 
 
