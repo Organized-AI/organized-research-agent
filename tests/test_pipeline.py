@@ -87,6 +87,8 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(normalize([hashtag_only, short_promo]), [])
         comment = instagram_comment_record("https://instagram.com/p/x/c/1/", "https://instagram.com/reel/x/", "operator", "I have run Meta ads successfully for years, but my whole budget spent outside my age demographic.", "18w ago")
         self.assertEqual(normalize([comment])[0]["content_type"], "comment")
+        long_id = "18145214677496903"
+        self.assertIn(long_id, instagram_comment_record(f"https://instagram.com/p/x/c/{long_id}/", "https://instagram.com/reel/x/", "operator", "I have run Meta ads successfully for years, but my whole budget spent outside my age demographic.", "18w ago")["source_url"])
         one = record("test", "https://example.test/a", "My Facebook ads tracking is broken", None, "fixture", {})
         self.assertEqual(len(normalize([one, dict(one)])), 1)
         rendered = record("reddit", "https://example.test/reddit", "r/FacebookAds • 2y ago author My Facebook ads are broken", None, "fixture", {}, fmt="rendered-html-dom")
