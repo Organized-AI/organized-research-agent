@@ -190,10 +190,11 @@ def reddit(_: str) -> list[dict]:
                 if len(text) < 180:
                     raise RuntimeError("Reddit public post body was too short to validate")
                 lines = [line.strip() for line in text.split("\n") if line.strip()]
+                author_match = re.search(r"\b\d+(?:y|mo|w|d|h) ago\s+([A-Za-z0-9_-]+)\b", text)
                 rows.append(record("reddit", url, text, next((line for line in lines if re.fullmatch(r"\d+(?:y|mo|w|d|h) ago", line)), None),
                                    "camoufox:normal-anonymous-rendered-shreddit-post", {"http_status": response.status if response else None,
                                    "discovery_query": queued["discovery_query"], "discovered_at": queued["discovered_at"]},
-                                   lines[3] if len(lines) > 3 else None, "rendered-html-dom"))
+                                   author_match.group(1) if author_match else None, "rendered-html-dom"))
                 persist_evidence([rows[-1]])
                 mark_discovery_attempt(url, "captured")
             except Exception as exc:
@@ -386,6 +387,10 @@ def normalize(items: list[dict]) -> list[dict]:
             relative = re.search(r"\b\d+(?:y|mo|w|d|h) ago\b", item["text"])
             if relative:
                 item["published_at"] = relative.group(0)
+        if item.get("platform") == "reddit":
+            author = re.search(r"\b\d+(?:y|mo|w|d|h) ago\s+([A-Za-z0-9_-]+)\b", item["text"])
+            if author:
+                item["author"] = author.group(1)
         item["advertiser_firsthand"], item["topics"], item["classification_reason"] = classify(item["text"])
         item["candidate_relevant"] = is_relevant_candidate(item["text"])
         item.update(publication_metadata(item.get("published_at"), item.get("captured_at")))
