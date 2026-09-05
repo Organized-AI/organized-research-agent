@@ -406,7 +406,7 @@ def classify(text: str) -> tuple[bool, list[str], str]:
 def is_relevant_candidate(text: str) -> bool:
     """Reject search-keyword collisions, generic news, consumer posts, and promotional copy."""
     t = text.lower()
-    paid_context = any(x in t for x in ("facebook ads", "meta ads", "google ads", "microsoft ads", "microsoft advertising", "bing ads", "ad account", "ad campaign", "media buying", "paid social", "attribution", "conversion tracking", "conversion mismatch", "offline conversion", "crm", "pixel")) or ("microsoft" in t and "ads" in t) or ("ads" in t and "campaign" in t)
+    paid_context = any(x in t for x in ("facebook ads", "meta ads", "#metaads", "google ads", "microsoft ads", "microsoft advertising", "bing ads", "ad account", "ad campaign", "media buying", "paid social", "attribution", "conversion tracking", "conversion mismatch", "offline conversion", "crm", "pixel")) or ("microsoft" in t and "ads" in t) or ("ads" in t and "campaign" in t)
     experience = any(x in t for x in ("my ad", "our ad", "my campaign", "our campaign", "client account", "i run", "we spend", "no ads", "wrong", "broken", "mismatch", "inaccurate", "missing", "bad lead", "low quality", "waste", "manual", "problem", "issue", "doesn't", "not working", "not running", "not delivering", "pausing", "disappeared", "diabolical", "struggle", "died", "failed", "fraud"))
     excluded = any(x in t for x in ("hate ads", "stop showing", "annoying ad", "connect your", "integrates with", "sign up", "book a demo", "free trial", "we help you", "i'll manage your", "i create and manage", "i will set up", "boost your business", "with froggyads", "ppc ads expert", "benchmarks reveal", "which is suitable for your campaign"))
     return paid_context and experience and not excluded
