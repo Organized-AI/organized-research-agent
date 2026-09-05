@@ -13,7 +13,7 @@ from urllib.request import urlopen
 sys.path.insert(0, str(Path(__file__).parents[1]))
 from analysis import MODEL, analyze, cosine, nearest
 from api import app
-from collect import classify, google_ads_community, load_discovery_queue, mark_discovery_attempt, merge_with_existing, normalize, persist_evidence, publication_metadata, record
+from collect import classify, google_ads_community, load_discovery_queue, mark_discovery_attempt, merge_with_existing, microsoft_ads_community, normalize, persist_evidence, publication_metadata, record
 from fastapi.testclient import TestClient
 
 
@@ -78,6 +78,8 @@ class PipelineTests(unittest.TestCase):
         self.assertTrue(classify("I'm running LinkedIn ads and can't do conversion tracking; it is a problem")[0])
         self.assertTrue(classify("I have ran all types of Facebook ads for my branded store, but my ads died")[0])
         self.assertTrue(classify("My Shopify analytics shows Google Ads clicks missing; its invalid-click system failed")[0])
+        self.assertTrue(classify("My Microsoft Advertising ads keep pausing and my campaigns are not running")[0])
+        self.assertTrue(classify("I have the same campaigns running since 2019, but my ads suddenly disappeared")[0])
         one = record("test", "https://example.test/a", "My Facebook ads tracking is broken", None, "fixture", {})
         self.assertEqual(len(normalize([one, dict(one)])), 1)
         rendered = record("reddit", "https://example.test/reddit", "r/FacebookAds • 2y ago author My Facebook ads are broken", None, "fixture", {}, fmt="rendered-html-dom")
@@ -124,6 +126,10 @@ class PipelineTests(unittest.TestCase):
     def test_google_ads_community_requires_original_hydration_body(self):
         with patch("collect.load_discovery_queue", return_value=[]):
             self.assertEqual(google_ads_community("ignored"), [])
+
+    def test_microsoft_ads_community_requires_original_html_body(self):
+        with patch("collect.load_discovery_queue", return_value=[]):
+            self.assertEqual(microsoft_ads_community("ignored"), [])
 
     def test_api_tenant_and_contract(self):
         client = TestClient(app)

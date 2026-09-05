@@ -64,6 +64,8 @@ SYNTER_INTEGRATIONS = (
     ("Google Drive", "storage / export", "live", "authorized account required"),
 )
 PUBLIC_RESEARCH_STATUS = {
+    "Google Ads": "active: author-bound original Google Ads Community posts",
+    "Microsoft Ads": "active: author-bound original Microsoft Q&A questions",
     "LinkedIn Ads": "active: concrete public post bodies, equivalence-checked static HTML",
     "Reddit Ads": "partial: prior normal rendered post preserved; later normal retrieval hit challenge",
     "TikTok Ads": "blocked: normal public search served a login shell",

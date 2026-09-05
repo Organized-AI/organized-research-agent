@@ -239,6 +239,41 @@ def google_ads_community(_: str) -> list[dict]:
     return rows
 
 
+def microsoft_ads_community(_: str) -> list[dict]:
+    """Extract author-bound original questions from normal public Microsoft Q&A HTML."""
+    from lxml import html as lxml_html
+    rows = []
+    for queued in load_discovery_queue("microsoft_ads_community")[:5]:
+        url = queued["source_url"]
+        try:
+            page = get_page(url)
+            document = lxml_html.fromstring(page)
+            question = document.xpath('//*[@id="question-details"]')
+            if len(question) != 1:
+                raise RuntimeError("Microsoft Q&A did not expose one original question")
+            question = question[0]
+            title = clean(" ".join(question.xpath(".//h1[1]//text()")))
+            author_nodes = (question.xpath('.//a[contains(@class, "profile-url")][1]//text()')
+                            or question.xpath('.//span[contains(@class, "has-text-subtle")][1]//text()'))
+            author = clean(" ".join(author_nodes))
+            published = question.xpath(".//local-time[1]/@datetime")
+            body = clean(" ".join(question.xpath(".//p[not(@class)][1]//text()")))
+            body = body.split("Locked Question.", 1)[0].strip()
+            anchors = ("ad", "campaign", "impression", "click", "budget")
+            if len(body) < 80 or not title or not author or not any(anchor in body.lower() for anchor in anchors):
+                raise RuntimeError("Microsoft Q&A page lacked an author-bound original advertiser body")
+            rows.append(record("microsoft_ads_community", url, title + "\n" + body, published[0] if published else None,
+                               "curl_cffi:microsoft-qna-original-question", {"bytes": len(page),
+                               "discovery_query": queued["discovery_query"], "discovered_at": queued["discovered_at"]},
+                               author, "community-html"))
+            persisted = persist_evidence([rows[-1]])
+            outcome = "captured" if any(item["id"] == rows[-1]["id"] for item in persisted) else "excluded_nonrelevant"
+            mark_discovery_attempt(url, outcome)
+        except Exception as exc:
+            mark_discovery_attempt(url, f"blocked_or_unverified: {type(exc).__name__}: {exc}")
+    return rows
+
+
 def page_probe(platform: str, url: str) -> list[dict]:
     """Record that a normal public search/page did not expose a usable discussion body."""
     page = get_page(url)
@@ -293,28 +328,30 @@ def linkedin_search(_: str) -> list[dict]:
 
 ADAPTERS = {"bluesky": bluesky, "mastodon": mastodon, "lemmy": lemmy, "peertube": peertube,
             "youtube": youtube, "reddit": reddit, "x": x_search, "tiktok": tiktok_search,
-            "linkedin": linkedin_search, "google_ads_community": google_ads_community}
+            "linkedin": linkedin_search, "google_ads_community": google_ads_community,
+            "microsoft_ads_community": microsoft_ads_community}
 ADAPTER_METHODS = {
     "bluesky": "public ATProto search endpoint", "mastodon": "public Mastodon tag timeline endpoint",
     "lemmy": "public Lemmy search endpoint", "peertube": "public PeerTube search endpoint",
     "youtube": "normal public YouTube search page with embedded result metadata", "reddit": "normal anonymous Camoufox rendered Reddit post",
     "x": "normal public X search page", "tiktok": "normal public TikTok search page", "linkedin": "curl_cffi static LinkedIn article HTML (Camoufox-equivalence checked)",
     "google_ads_community": "curl_cffi Google Ads Community hydration (Camoufox-equivalence checked)",
+    "microsoft_ads_community": "curl_cffi Microsoft Q&A original-question HTML (Camoufox-equivalence checked)",
 }
 
 
 def classify(text: str) -> tuple[bool, list[str], str]:
     """Conservative transparent classification; it is not a claim of market incidence."""
     t = text.lower()
-    commercial = any(x in t for x in ("ads", "attribution", "pixel", "lead", "conversion", "crm", "media buying", "campaign"))
-    pain = any(x in t for x in ("wrong", "broken", "mismatch", "inaccurate", "bad lead", "low quality", "waste", "manual", "problem", "issue", "doesn't", "not working", "struggle", "died", "failed", "fraud"))
+    commercial = any(x in t for x in ("ads", "attribution", "pixel", "lead", "conversion", "crm", "media buying", "campaign", "microsoft advertising", "microsoft ads", "bing ads"))
+    pain = any(x in t for x in ("wrong", "broken", "mismatch", "inaccurate", "bad lead", "low quality", "waste", "manual", "problem", "issue", "doesn't", "not working", "not running", "pausing", "disappeared", "struggle", "died", "failed", "fraud"))
     # Possessives alone are too narrow: operators often report a live observation
     # as "I am seeing" or "we are getting" without writing "my campaign".
     # These verbs are only accepted alongside the independent commercial + pain
     # gates below, so an advisory post does not become firsthand merely by using I/we.
     first = bool(re.search(
         r"\b(?:my|our)\s+(?:ads?|campaigns?|leads?|accounts?|shopify|store)\b|\bwe\s+spend\b|"
-        r"\bi(?:\s+am|'m)\s+(?:running|trying)\b|\bi(?:\s+have|'ve)\s+(?:run|ran)\b|\bi\s+run\b|"
+        r"\bi(?:\s+am|'m)\s+(?:running|trying)\b|\bi(?:\s+have|'ve)\s+(?:(?:the\s+)?same\s+)?(?:run|ran|campaigns?)\b|\bi\s+run\b|"
         r"\bclient\s+account\b|\bfor\s+a\s+client\b|"
         r"\b(?:i(?:\s+am|'m)|we(?:\s+are|'re))\s+(?:seeing|experiencing|getting)\b",
         t,
@@ -330,8 +367,8 @@ def classify(text: str) -> tuple[bool, list[str], str]:
 def is_relevant_candidate(text: str) -> bool:
     """Reject search-keyword collisions, generic news, consumer posts, and promotional copy."""
     t = text.lower()
-    paid_context = any(x in t for x in ("facebook ads", "meta ads", "google ads", "ad account", "ad campaign", "media buying", "paid social", "attribution", "conversion tracking", "conversion mismatch", "offline conversion", "crm", "pixel"))
-    experience = any(x in t for x in ("my ad", "our ad", "my campaign", "our campaign", "client account", "i run", "we spend", "wrong", "broken", "mismatch", "inaccurate", "missing", "bad lead", "low quality", "waste", "manual", "problem", "issue", "doesn't", "not working", "struggle", "died", "failed", "fraud"))
+    paid_context = any(x in t for x in ("facebook ads", "meta ads", "google ads", "microsoft ads", "microsoft advertising", "bing ads", "ad account", "ad campaign", "media buying", "paid social", "attribution", "conversion tracking", "conversion mismatch", "offline conversion", "crm", "pixel")) or ("microsoft" in t and "ads" in t) or ("ads" in t and "campaign" in t)
+    experience = any(x in t for x in ("my ad", "our ad", "my campaign", "our campaign", "client account", "i run", "we spend", "no ads", "wrong", "broken", "mismatch", "inaccurate", "missing", "bad lead", "low quality", "waste", "manual", "problem", "issue", "doesn't", "not working", "not running", "pausing", "disappeared", "struggle", "died", "failed", "fraud"))
     excluded = any(x in t for x in ("hate ads", "stop showing", "annoying ad", "connect your", "integrates with", "sign up", "book a demo", "free trial", "we help you", "i'll manage your", "i create and manage", "i will set up", "boost your business", "with froggyads", "ppc ads expert", "benchmarks reveal", "which is suitable for your campaign"))
     return paid_context and experience and not excluded
 
@@ -387,7 +424,7 @@ def run() -> list[dict]:
     for name, adapter in ADAPTERS.items():
         platform_rows: list[dict] = []
         errors: list[str] = []
-        queries = ("direct-page-check",) if name in {"reddit", "x", "tiktok", "linkedin", "google_ads_community"} else TOPICS
+        queries = ("direct-page-check",) if name in {"reddit", "x", "tiktok", "linkedin", "google_ads_community", "microsoft_ads_community"} else TOPICS
         with ThreadPoolExecutor(max_workers=len(queries)) as executor:
             futures = {executor.submit(adapter, query): query for query in queries}
             for future in as_completed(futures):
