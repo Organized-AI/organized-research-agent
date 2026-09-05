@@ -85,7 +85,7 @@ class PipelineTests(unittest.TestCase):
         hashtag_only = record("instagram", "https://example.test/tags", "#metaads #indianbrand #clothingbrand", "2026-04-17", "fixture", {}, "merchant")
         short_promo = record("instagram", "https://example.test/promo", "Comment ADS for my Meta ads setup guide #metaads", "2026-04-17", "fixture", {}, "merchant")
         self.assertEqual(normalize([hashtag_only, short_promo]), [])
-        comment = instagram_comment_record("https://instagram.com/p/x/c/1/", "https://instagram.com/reel/x/", "operator", "I'm $75 a day and Meta ads spent outside my age demographic.", "18w ago")
+        comment = instagram_comment_record("https://instagram.com/p/x/c/1/", "https://instagram.com/reel/x/", "operator", "I have run Meta ads successfully for years, but my whole budget spent outside my age demographic.", "18w ago")
         self.assertEqual(normalize([comment])[0]["content_type"], "comment")
         one = record("test", "https://example.test/a", "My Facebook ads tracking is broken", None, "fixture", {})
         self.assertEqual(len(normalize([one, dict(one)])), 1)
