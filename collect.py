@@ -43,6 +43,13 @@ def record(platform: str, url: str, text: str, published_at: str | None, method:
             "metrics": metrics, "author": author, "provenance": "public", "live": True}
 
 
+def instagram_comment_record(url: str, parent_url: str, author: str, text: str, published_at: str | None) -> dict[str, Any]:
+    """Represent an individually attributable public comment without attributing it to its parent author."""
+    item = record("instagram", url, text, published_at, "browser-verified:instagram-public-comment", {"parent_url": parent_url}, author, "instagram-public-comment")
+    item.update(content_type="comment", parent_url=parent_url)
+    return item
+
+
 def publication_metadata(published_at: str | None, captured_at: str | None) -> dict[str, Any]:
     """Expose date precision without inventing a timestamp from a relative label."""
     if not published_at:
@@ -407,7 +414,7 @@ def is_relevant_candidate(text: str) -> bool:
     """Reject search-keyword collisions, generic news, consumer posts, and promotional copy."""
     t = text.lower()
     paid_context = any(x in t for x in ("facebook ads", "meta ads", "#metaads", "google ads", "microsoft ads", "microsoft advertising", "bing ads", "ad account", "ad campaign", "media buying", "paid social", "attribution", "conversion tracking", "conversion mismatch", "offline conversion", "crm", "pixel")) or ("microsoft" in t and "ads" in t) or ("ads" in t and "campaign" in t)
-    experience = any(x in t for x in ("my ad", "our ad", "my campaign", "our campaign", "client account", "i run", "we spend", "no ads", "wrong", "broken", "mismatch", "inaccurate", "missing", "bad lead", "low quality", "waste", "manual", "problem", "issue", "doesn't", "not working", "not running", "not delivering", "pausing", "disappeared", "diabolical", "struggle", "died", "failed", "fraud"))
+    experience = any(x in t for x in ("my ad", "our ad", "my campaign", "our campaign", "client account", "i run", "i have run", "we spend", "no ads", "wrong", "broken", "mismatch", "inaccurate", "missing", "bad lead", "low quality", "waste", "manual", "problem", "issue", "doesn't", "not working", "not running", "not delivering", "pausing", "disappeared", "diabolical", "struggle", "died", "failed", "fraud"))
     excluded = any(x in t for x in ("hate ads", "stop showing", "annoying ad", "connect your", "integrates with", "sign up", "book a demo", "free trial", "we help you", "i'll manage your", "i create and manage", "i will set up", "boost your business", "with froggyads", "ppc ads expert", "benchmarks reveal", "which is suitable for your campaign"))
     return paid_context and experience and not excluded
 

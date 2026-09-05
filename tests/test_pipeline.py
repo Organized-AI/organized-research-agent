@@ -13,7 +13,7 @@ from urllib.request import urlopen
 sys.path.insert(0, str(Path(__file__).parents[1]))
 from analysis import MODEL, analyze, cosine, nearest
 from api import app
-from collect import classify, google_ads_community, instagram, load_discovery_queue, mark_discovery_attempt, merge_with_existing, microsoft_ads_community, normalize, persist_evidence, publication_metadata, record
+from collect import classify, google_ads_community, instagram, instagram_comment_record, load_discovery_queue, mark_discovery_attempt, merge_with_existing, microsoft_ads_community, normalize, persist_evidence, publication_metadata, record
 from fastapi.testclient import TestClient
 
 
@@ -85,6 +85,8 @@ class PipelineTests(unittest.TestCase):
         hashtag_only = record("instagram", "https://example.test/tags", "#metaads #indianbrand #clothingbrand", "2026-04-17", "fixture", {}, "merchant")
         short_promo = record("instagram", "https://example.test/promo", "Comment ADS for my Meta ads setup guide #metaads", "2026-04-17", "fixture", {}, "merchant")
         self.assertEqual(normalize([hashtag_only, short_promo]), [])
+        comment = instagram_comment_record("https://instagram.com/p/x/c/1/", "https://instagram.com/reel/x/", "operator", "I'm $75 a day and Meta ads spent outside my age demographic.", "18w ago")
+        self.assertEqual(normalize([comment])[0]["content_type"], "comment")
         one = record("test", "https://example.test/a", "My Facebook ads tracking is broken", None, "fixture", {})
         self.assertEqual(len(normalize([one, dict(one)])), 1)
         rendered = record("reddit", "https://example.test/reddit", "r/FacebookAds • 2y ago author My Facebook ads are broken", None, "fixture", {}, fmt="rendered-html-dom")

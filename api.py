@@ -100,6 +100,8 @@ class Evidence(BaseModel):
     publication_age_days: int | None = None
     cluster: int | None = None
     similarity: float | None = None
+    content_type: str | None = None
+    parent_url: str | None = None
 
 
 def tenant(header: str | None) -> None:
