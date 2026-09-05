@@ -71,7 +71,7 @@ PUBLIC_RESEARCH_STATUS = {
     "TikTok Ads": "blocked: normal public search served a login shell",
     "X Ads": "blocked: normal public search served a login shell",
     "YouTube": "available: public search-page metadata adapter; no retained firsthand record",
-    "Meta Ads (Facebook, Instagram, Messenger, Audience Network)": "not implemented: no verified original public body retained",
+    "Meta Ads (Facebook, Instagram, Messenger, Audience Network)": "partial: author-bound public Instagram original post",
     "Pinterest Ads": "not implemented: no verified original public body retained",
     "Snapchat Ads": "not implemented: no verified original public body retained",
     "Nextdoor Ads": "not implemented: no verified original public body retained",

@@ -240,6 +240,35 @@ def google_ads_community(_: str) -> list[dict]:
     return rows
 
 
+def instagram(_: str) -> list[dict]:
+    """Capture queued original Instagram captions exposed in normal public HTML."""
+    from lxml import html as lxml_html
+    rows = []
+    for queued in load_discovery_queue("instagram")[:5]:
+        url = queued["source_url"]
+        try:
+            page = get_page(url)
+            description = lxml_html.fromstring(page).xpath('//meta[@name="description"]/@content')
+            if not description:
+                raise RuntimeError("Instagram did not expose public original-post metadata")
+            matched = re.match(r".*? - (.+?) on (.+?): [\"“](.*)[\"”]\\.?$", clean(description[0]))
+            if not matched:
+                raise RuntimeError("Instagram public metadata lacked author, date, or caption")
+            author, published, caption = matched.groups()
+            if len(caption) < 80 or not any(term in caption.lower() for term in ("meta ads", "facebook ads", "instagram ads")):
+                raise RuntimeError("Instagram caption was not an advertiser-platform observation")
+            rows.append(record("instagram", url, caption, published,
+                               "curl_cffi:instagram-public-html-meta", {"bytes": len(page),
+                               "discovery_query": queued["discovery_query"], "discovered_at": queued["discovered_at"]},
+                               author, "instagram-public-html-meta"))
+            persisted = persist_evidence([rows[-1]])
+            outcome = "captured" if any(item["id"] == rows[-1]["id"] for item in persisted) else "excluded_nonrelevant"
+            mark_discovery_attempt(url, outcome)
+        except Exception as exc:
+            mark_discovery_attempt(url, f"blocked_or_unverified: {type(exc).__name__}: {exc}")
+    return rows
+
+
 def microsoft_ads_community(_: str) -> list[dict]:
     """Extract author-bound original questions from normal public Microsoft Q&A HTML."""
     from lxml import html as lxml_html
@@ -329,7 +358,7 @@ def linkedin_search(_: str) -> list[dict]:
 
 ADAPTERS = {"bluesky": bluesky, "mastodon": mastodon, "lemmy": lemmy, "peertube": peertube,
             "youtube": youtube, "reddit": reddit, "x": x_search, "tiktok": tiktok_search,
-            "linkedin": linkedin_search, "google_ads_community": google_ads_community,
+            "linkedin": linkedin_search, "google_ads_community": google_ads_community, "instagram": instagram,
             "microsoft_ads_community": microsoft_ads_community}
 ADAPTER_METHODS = {
     "bluesky": "public ATProto search endpoint", "mastodon": "public Mastodon tag timeline endpoint",
@@ -337,6 +366,7 @@ ADAPTER_METHODS = {
     "youtube": "normal public YouTube search page with embedded result metadata", "reddit": "normal anonymous Camoufox rendered Reddit post",
     "x": "normal public X search page", "tiktok": "normal public TikTok search page", "linkedin": "curl_cffi static LinkedIn article HTML (Camoufox-equivalence checked)",
     "google_ads_community": "curl_cffi Google Ads Community hydration (Camoufox-equivalence checked)",
+    "instagram": "curl_cffi Instagram public HTML metadata (normal-browser equivalence checked)",
     "microsoft_ads_community": "curl_cffi Microsoft Q&A original-question HTML (Camoufox-equivalence checked)",
 }
 
@@ -369,7 +399,7 @@ def is_relevant_candidate(text: str) -> bool:
     """Reject search-keyword collisions, generic news, consumer posts, and promotional copy."""
     t = text.lower()
     paid_context = any(x in t for x in ("facebook ads", "meta ads", "google ads", "microsoft ads", "microsoft advertising", "bing ads", "ad account", "ad campaign", "media buying", "paid social", "attribution", "conversion tracking", "conversion mismatch", "offline conversion", "crm", "pixel")) or ("microsoft" in t and "ads" in t) or ("ads" in t and "campaign" in t)
-    experience = any(x in t for x in ("my ad", "our ad", "my campaign", "our campaign", "client account", "i run", "we spend", "no ads", "wrong", "broken", "mismatch", "inaccurate", "missing", "bad lead", "low quality", "waste", "manual", "problem", "issue", "doesn't", "not working", "not running", "pausing", "disappeared", "struggle", "died", "failed", "fraud"))
+    experience = any(x in t for x in ("my ad", "our ad", "my campaign", "our campaign", "client account", "i run", "we spend", "no ads", "wrong", "broken", "mismatch", "inaccurate", "missing", "bad lead", "low quality", "waste", "manual", "problem", "issue", "doesn't", "not working", "not running", "pausing", "disappeared", "diabolical", "struggle", "died", "failed", "fraud"))
     excluded = any(x in t for x in ("hate ads", "stop showing", "annoying ad", "connect your", "integrates with", "sign up", "book a demo", "free trial", "we help you", "i'll manage your", "i create and manage", "i will set up", "boost your business", "with froggyads", "ppc ads expert", "benchmarks reveal", "which is suitable for your campaign"))
     return paid_context and experience and not excluded
 
@@ -429,7 +459,7 @@ def run() -> list[dict]:
     for name, adapter in ADAPTERS.items():
         platform_rows: list[dict] = []
         errors: list[str] = []
-        queries = ("direct-page-check",) if name in {"reddit", "x", "tiktok", "linkedin", "google_ads_community", "microsoft_ads_community"} else TOPICS
+        queries = ("direct-page-check",) if name in {"reddit", "x", "tiktok", "linkedin", "google_ads_community", "microsoft_ads_community", "instagram"} else TOPICS
         with ThreadPoolExecutor(max_workers=len(queries)) as executor:
             futures = {executor.submit(adapter, query): query for query in queries}
             for future in as_completed(futures):

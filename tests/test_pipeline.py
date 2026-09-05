@@ -13,7 +13,7 @@ from urllib.request import urlopen
 sys.path.insert(0, str(Path(__file__).parents[1]))
 from analysis import MODEL, analyze, cosine, nearest
 from api import app
-from collect import classify, google_ads_community, load_discovery_queue, mark_discovery_attempt, merge_with_existing, microsoft_ads_community, normalize, persist_evidence, publication_metadata, record
+from collect import classify, google_ads_community, instagram, load_discovery_queue, mark_discovery_attempt, merge_with_existing, microsoft_ads_community, normalize, persist_evidence, publication_metadata, record
 from fastapi.testclient import TestClient
 
 
@@ -131,6 +131,10 @@ class PipelineTests(unittest.TestCase):
     def test_microsoft_ads_community_requires_original_html_body(self):
         with patch("collect.load_discovery_queue", return_value=[]):
             self.assertEqual(microsoft_ads_community("ignored"), [])
+
+    def test_instagram_requires_queued_public_post(self):
+        with patch("collect.load_discovery_queue", return_value=[]):
+            self.assertEqual(instagram("ignored"), [])
 
     def test_api_tenant_and_contract(self):
         client = TestClient(app)
