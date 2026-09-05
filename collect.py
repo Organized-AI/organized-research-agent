@@ -259,8 +259,11 @@ def instagram(_: str) -> list[dict]:
             if not matched:
                 raise RuntimeError("Instagram public metadata lacked author, date, or caption")
             author, published, caption = matched.groups()
-            published = datetime.strptime(published, "%B %d, %Y").date().isoformat()
-            if len(caption) < 25 or len(caption.split()) < 5 or not any(term in caption.lower() for term in ("meta ads", "facebook ads", "instagram ads")):
+            try:
+                published = datetime.strptime(published, "%B %d, %Y").date().isoformat()
+            except ValueError:
+                pass  # Preserve the source's date label; do not infer an omitted year.
+            if len(caption) < 25 or len(caption.split()) < 5 or not any(term in caption.lower() for term in ("meta ads", "#metaads", "facebook ads", "instagram ads")):
                 raise RuntimeError("Instagram caption was not an advertiser-platform observation")
             rows.append(record("instagram", url, caption, published,
                                "curl_cffi:instagram-public-html-meta", {"bytes": len(page),
