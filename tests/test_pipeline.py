@@ -80,6 +80,8 @@ class PipelineTests(unittest.TestCase):
         self.assertTrue(classify("My Shopify analytics shows Google Ads clicks missing; its invalid-click system failed")[0])
         self.assertTrue(classify("My Microsoft Advertising ads keep pausing and my campaigns are not running")[0])
         self.assertTrue(classify("I have the same campaigns running since 2019, but my ads suddenly disappeared")[0])
+        short_original = record("instagram", "https://example.test/short", "Idk why but Meta ads are not delivering at all!", "2026-04-17", "fixture", {}, "merchant")
+        self.assertEqual(normalize([short_original])[0]["classification_reason"], "relevant_candidate_needs_review")
         one = record("test", "https://example.test/a", "My Facebook ads tracking is broken", None, "fixture", {})
         self.assertEqual(len(normalize([one, dict(one)])), 1)
         rendered = record("reddit", "https://example.test/reddit", "r/FacebookAds • 2y ago author My Facebook ads are broken", None, "fixture", {}, fmt="rendered-html-dom")

@@ -260,7 +260,7 @@ def instagram(_: str) -> list[dict]:
                 raise RuntimeError("Instagram public metadata lacked author, date, or caption")
             author, published, caption = matched.groups()
             published = datetime.strptime(published, "%B %d, %Y").date().isoformat()
-            if len(caption) < 80 or not any(term in caption.lower() for term in ("meta ads", "facebook ads", "instagram ads")):
+            if len(caption) < 25 or len(caption.split()) < 5 or not any(term in caption.lower() for term in ("meta ads", "facebook ads", "instagram ads")):
                 raise RuntimeError("Instagram caption was not an advertiser-platform observation")
             rows.append(record("instagram", url, caption, published,
                                "curl_cffi:instagram-public-html-meta", {"bytes": len(page),
@@ -404,7 +404,7 @@ def is_relevant_candidate(text: str) -> bool:
     """Reject search-keyword collisions, generic news, consumer posts, and promotional copy."""
     t = text.lower()
     paid_context = any(x in t for x in ("facebook ads", "meta ads", "google ads", "microsoft ads", "microsoft advertising", "bing ads", "ad account", "ad campaign", "media buying", "paid social", "attribution", "conversion tracking", "conversion mismatch", "offline conversion", "crm", "pixel")) or ("microsoft" in t and "ads" in t) or ("ads" in t and "campaign" in t)
-    experience = any(x in t for x in ("my ad", "our ad", "my campaign", "our campaign", "client account", "i run", "we spend", "no ads", "wrong", "broken", "mismatch", "inaccurate", "missing", "bad lead", "low quality", "waste", "manual", "problem", "issue", "doesn't", "not working", "not running", "pausing", "disappeared", "diabolical", "struggle", "died", "failed", "fraud"))
+    experience = any(x in t for x in ("my ad", "our ad", "my campaign", "our campaign", "client account", "i run", "we spend", "no ads", "wrong", "broken", "mismatch", "inaccurate", "missing", "bad lead", "low quality", "waste", "manual", "problem", "issue", "doesn't", "not working", "not running", "not delivering", "pausing", "disappeared", "diabolical", "struggle", "died", "failed", "fraud"))
     excluded = any(x in t for x in ("hate ads", "stop showing", "annoying ad", "connect your", "integrates with", "sign up", "book a demo", "free trial", "we help you", "i'll manage your", "i create and manage", "i will set up", "boost your business", "with froggyads", "ppc ads expert", "benchmarks reveal", "which is suitable for your campaign"))
     return paid_context and experience and not excluded
 
