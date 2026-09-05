@@ -50,6 +50,10 @@ def publication_metadata(published_at: str | None, captured_at: str | None) -> d
     try:
         published = datetime.fromisoformat(published_at.replace("Z", "+00:00"))
         captured = datetime.fromisoformat((captured_at or now()).replace("Z", "+00:00"))
+        if published.tzinfo is None:
+            published = published.replace(tzinfo=timezone.utc)
+        if captured.tzinfo is None:
+            captured = captured.replace(tzinfo=timezone.utc)
         return {"publication_date_status": "exact", "publication_age_days": max(0, (captured - published).days)}
     except ValueError:
         return {"publication_date_status": "relative_source_label", "publication_age_days": None}
@@ -251,10 +255,11 @@ def instagram(_: str) -> list[dict]:
             description = lxml_html.fromstring(page).xpath('//meta[@name="description"]/@content')
             if not description:
                 raise RuntimeError("Instagram did not expose public original-post metadata")
-            matched = re.match(r".*? - (.+?) on (.+?): [\"“](.*)[\"”]\\.?$", clean(description[0]))
+            matched = re.match(r'.*? - (.+?) on (.+?): ["“](.*)["”]$', clean(description[0]).removesuffix("."))
             if not matched:
                 raise RuntimeError("Instagram public metadata lacked author, date, or caption")
             author, published, caption = matched.groups()
+            published = datetime.strptime(published, "%B %d, %Y").date().isoformat()
             if len(caption) < 80 or not any(term in caption.lower() for term in ("meta ads", "facebook ads", "instagram ads")):
                 raise RuntimeError("Instagram caption was not an advertiser-platform observation")
             rows.append(record("instagram", url, caption, published,

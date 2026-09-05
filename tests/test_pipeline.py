@@ -109,6 +109,7 @@ class PipelineTests(unittest.TestCase):
 
     def test_queue_and_publication_precision(self):
         self.assertEqual(publication_metadata("2025-01-01T00:00:00Z", "2025-01-03T00:00:00Z"), {"publication_date_status": "exact", "publication_age_days": 2})
+        self.assertEqual(publication_metadata("2025-01-01", "2025-01-03T00:00:00Z"), {"publication_date_status": "exact", "publication_age_days": 2})
         self.assertEqual(publication_metadata("5mo ago", "2025-01-03T00:00:00Z")["publication_date_status"], "relative_source_label")
         from unittest.mock import patch
         with patch("collect.DISCOVERY_QUEUE") as path:
