@@ -29,3 +29,7 @@ The test suite covers conservative candidate classification/deduplication, 384-d
 Each run writes ignored `data/collection-report.json` with exact per-platform retrieval/accepted/error counts. “Accepted” means the transparent classifier detected a first-person advertiser/operator complaint; “candidate” means directly retrieved material that needs review. Shares use all de-duplicated direct candidates as their denominator. One snapshot is explicitly insufficient for a trend or representative market-incidence claim.
 
 Current adapters cover public Bluesky, Mastodon, Lemmy, and PeerTube endpoints plus normal public YouTube search pages. The run also probes Reddit, X, TikTok, and LinkedIn pages, recording a login shell, challenge, 403, or absent public post body as an access limitation—not as evidence. Availability/relevance is expected to vary; no search snippets or fixtures replace unavailable bodies.
+
+---
+
+Maintained by Jordaaan Hill ([LinkedIn](https://www.linkedin.com/in/jordaaanhill)).
